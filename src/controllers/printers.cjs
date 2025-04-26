@@ -422,8 +422,8 @@ async function checkPrinterOnline(ipAddress) {
 
 controller.printTestPage = (req, res) => {
   try {
-    // const device  = new escpos.USB(vId, pId);
-    const device = new escpos.Network('127.0.0.1', 9105);
+    const device  = new escpos.USB(vId, pId);
+    // const device = new escpos.Network('127.0.0.1', 9105);
     const options = { encoding: "GB18030", width: 56 /* default */ }
     const printer = new escpos.Printer(device, options);
 
