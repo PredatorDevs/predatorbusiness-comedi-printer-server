@@ -1242,6 +1242,205 @@ controller.printDteVoucher = (req, res) => {
   }
 }
 
+controller.printOrderSaleVoucher = (req, res) => {
+  try {
+    const { useNetworkPrint } = req.query;
+    
+    let device;
+
+    if (+useNetworkPrint === 1) {
+      device = new escpos.Network('192.168.1.100', 9105);
+    } else {
+      device = new escpos.USB(vId, pId);
+    }
+    // const device  = new escpos.USB(vId, pId);
+    // const device = new escpos.Network('127.0.0.1', 9105);
+    const options = { encoding: "GB18030", width: 48 /* default */ }
+    const printer = new escpos.Printer(device, options);
+
+    // invoiceHeaderData = { customerFullname, documentDatetime, customerAddress, customerDui, customerNit, customerPhone, totalSale, totalToLetters }
+    // invoiceBodyData = [{ quantity, description, unitPrice, subTotal }]
+    const { invoiceHeaderData, invoiceBodyData } = req.body;
+
+    if (invoiceHeaderData === undefined || invoiceBodyData === undefined) {
+      throw "You must provide a header and body sale data to print";
+    }
+
+    const {
+      id: currentSaleId,
+      companyId,
+      orderNumber,
+      deliveryRouteId,
+      deliveryRouteName,
+      shiftcutId,
+      cashierId,
+      locationId,
+      locationName,
+      locationPhone,
+      locationAddress,
+      locationDepartmentName,
+      locationCityName,
+      locationDepartmentMhCode,
+      locationCityMhCode,
+      locationEmail,
+      ownerNit,
+      ownerNrc,
+      ownerName,
+      ownerActivityCode,
+      ownerActivityDescription,
+      ownerTradename,
+      establishmentType,
+      customerId,
+      documentDatetime,
+      documentTypeId,
+      documentTypeName,
+      paymentTypeId,
+      paymentTypeName,
+      status,
+      statusName,
+      statusColor,
+      total,
+      totalTaxes,
+      taxableSubTotal,
+      taxableSubTotalWithoutTaxes,
+      noTaxableSubTotal,
+      createdBy,
+      createdByFullname,
+      userPINCodeId,
+      userPINCodeFullname,
+      customerCode,
+      customerFullname,
+      customerAddress,
+      customerDui,
+      customerNit,
+      customerNrc,
+      customerBusinessLine,
+      customerOccupation,
+      customerDefPriceIndex,
+      customerDepartmentName,
+      customerCityName
+    } = invoiceHeaderData;
+
+    device.open(function(error){
+      printer
+      .font('A')
+      .align('CT')
+      .style('NORMAL')
+      .size(0, 0)
+      .text(ownerTradename || '')
+      .text(locationAddress || '')
+      .text(locationPhone || '')
+      // .text('*** TICKET DE CONTROL INTERNO ***')
+      // .text(`NIT: ${'0000-000000-000-0'} - NRC: ${'00000-0'}`)
+      .feed(1)
+      .align('LT')
+      .tableCustom([
+        { text: `PEDIDO N: ${currentSaleId}`, align: "LEFT", width: 0.50 },
+        { text: `SUC: ${String(locationName).toUpperCase()}`, align: "RIGHT", width: 0.50 }
+        // { text: `COND: ${String(paymentTypeName).toUpperCase()}`, align: "RIGHT", width: 0.50 }
+      ])
+      // .tableCustom([
+      //   // { text: `DOC: ${documentTypeName}`, align: "LEFT", width: 0.50 },
+      //   // { text: `SUC: ${String(locationName).toUpperCase()}`, align: "RIGHT", width: 0.50 }
+      // ])
+      .text(`FECHA: ${dayjs(documentDatetime).format('YYYY-MM-DD hh:mm:ss')}`)
+      .text(`CLIENTE: ${customerFullname}`)
+      .text(`VENDEDOR: ${userPINCodeFullname || '-'}`)
+      .text(`RUTA: ${deliveryRouteName || '-'}`)
+
+      // .text(`DUI: ${customerDui || '-'}`)
+      // .text(`NIT: ${customerNit || '-'}`)
+      // .text(`NRC: ${customerNrc || '-'}`)
+      // .qrimage('https://github.com/song940/node-escpos', function(err){
+
+      // })
+      .feed(1) // LINE 9
+      .align('CT')
+      // .text('------------------------------------------------')
+      // .tableCustom([
+      //   { text: `DESCRIPCION`, align: "LEFT", width: 1 }
+      // ])
+      // .style('U')
+      .tableCustom([
+        // { text: `CANT.`, align: "LEFT", width: 0.15 },
+        { text: `DESCRIPCION`, align: "LEFT", width: 0.55 },
+        // { text: `PRES.`, align: "LEFT", width: 0.25 },
+        { text: ``, align: "RIGHT", width: 0.25 },
+        { text: `SUBTOTAL`, align: "RIGHT", width: 0.20 }
+      ])
+      .text('------------------------------------------------')
+      // .feed(1)
+      for (let i = 0; i < invoiceBodyData.length; i++) {
+        const {
+          orderSaleDetailId,
+          orderSaleId,
+          productId,
+          productCode,
+          productName,
+          categoryName,
+          brandName,
+          quantityFactorName,
+          quantityFactor,
+          unitPrice,
+          unitPriceNoTaxes,
+          unitCost,
+          unitCostNoTaxes,
+          subTotalCost,
+          totalCostTaxes,
+          totalCost,
+          quantity,
+          subTotal,
+          isVoided,
+          isActive,
+          taxesData,
+          totalTaxes,
+          taxableSubTotal,
+          taxableSubTotalWithoutTaxes,
+          noTaxableSubTotal
+        } = invoiceBodyData[i];
+
+        printer.style('U').tableCustom([
+          { text: `${productName || ""}`, align: "LEFT", width: 0.99 },
+        ]);
+
+        printer.style('U').tableCustom([
+          { text: `${Number(quantity).toFixed(4) || 0} x $${(+unitPrice).toFixed(4) || 0}`, align: "LEFT", width: 0.50 },
+          { text: `${Number(taxableSubTotal).toFixed(4) || 0}`, align: "RIGHT", width: 0.50 }
+        ]);
+
+        if((i + 1) < invoiceBodyData.length) printer.feed(1);
+      } // LINE 15
+      printer.style('NORMAL')
+      // .feed(1)
+      .text('------------------------------------------------')
+      printer.tableCustom([
+        { text: `SUBTOTAL`, align: "RIGHT", width: 0.75 },
+        // { text: ``, align: "LEFT", width: 0.25 },
+        // { text: ``, align: "RIGHT", width: 0.25 },
+        { text: `${Number(taxableSubTotal).toFixed(2) || 0}`, align: "RIGHT", width: 0.25 }
+      ])
+      printer.tableCustom([
+        { text: `TOTAL A PAGAR`, align: "RIGHT", width: 0.75 },
+        { text: `${Number(+total).toFixed(2) || 0}`, align: "RIGHT", width: 0.25 }
+      ])
+      .align('CT')
+      .control('FF')
+      .text('*** GRACIAS POR PREFERIRNOS ***')
+      .feed(2)
+      .cut()
+      .close((err) => {
+        if (err) {
+          res.json({ data: "Print error" });
+        } else {
+          res.json({ data: "Print success" });
+        }
+      });
+    });
+  } catch(err) {
+    res.status(500).json({ status: 500, message: 'Printer not found!', errorContent: err });
+  }
+}
+
 controller.printCF = (req, res) => {
   try {
     const device = new escpos.USB(matrix_vId, matrix_pId);
