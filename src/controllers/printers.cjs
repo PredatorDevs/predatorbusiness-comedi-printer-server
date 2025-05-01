@@ -1423,7 +1423,7 @@ controller.printOrderSaleVoucher = (req, res) => {
         { text: `TOTAL A PAGAR`, align: "RIGHT", width: 0.75 },
         { text: `${Number(+total).toFixed(2) || 0}`, align: "RIGHT", width: 0.25 }
       ])
-      .feed(1)
+      .feed(3)
       .align('CT')
       .control('FF')
       .text('F. ____________________________')
