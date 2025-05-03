@@ -1348,6 +1348,7 @@ controller.printOrderSaleVoucher = (req, res) => {
       .text(`DIRECCION: ${customerAddress}`)
       .text(`VENDEDOR: ${userPINCodeFullname || '-'}`)
       .text(`RUTA: ${deliveryRouteName || '-'}`)
+      .text(`CONDICION: ${paymentTypeName || '-'}`)
 
       // .text(`DUI: ${customerDui || '-'}`)
       // .text(`NIT: ${customerNit || '-'}`)
