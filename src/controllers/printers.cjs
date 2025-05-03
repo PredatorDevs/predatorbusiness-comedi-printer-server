@@ -1345,6 +1345,7 @@ controller.printOrderSaleVoucher = (req, res) => {
       // ])
       .text(`FECHA: ${dayjs(documentDatetime).format('YYYY-MM-DD hh:mm:ss')}`)
       .text(`CLIENTE: ${customerFullname}`)
+      .text(`DIRECCION: ${customerAddress}`)
       .text(`VENDEDOR: ${userPINCodeFullname || '-'}`)
       .text(`RUTA: ${deliveryRouteName || '-'}`)
 
