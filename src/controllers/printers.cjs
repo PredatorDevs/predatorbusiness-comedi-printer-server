@@ -861,11 +861,14 @@ controller.printInternalSaleTicket = (req, res) => {
 controller.printDteVoucher = (req, res) => {
   try {
     const { useNetworkPrint } = req.query;
+    const { invoiceHeaderData, invoiceBodyData, cashierPrinterIp, cashierPrinterPort } = req.body;
     
     let device;
 
     if (+useNetworkPrint === 1) {
-      device = new escpos.Network('192.168.1.100', 9105);
+      // console.log("Using network printer");
+      // console.log(cashierPrinterIp || '192.168.1.100', cashierPrinterPort || 9100);
+      device = new escpos.Network(cashierPrinterIp || '192.168.1.100', cashierPrinterPort || 9100);
     } else {
       device = new escpos.USB(vId, pId);
     }
@@ -876,7 +879,6 @@ controller.printDteVoucher = (req, res) => {
 
     // invoiceHeaderData = { customerFullname, documentDatetime, customerAddress, customerDui, customerNit, customerPhone, totalSale, totalToLetters }
     // invoiceBodyData = [{ quantity, description, unitPrice, subTotal }]
-    const { invoiceHeaderData, invoiceBodyData } = req.body;
 
     if (invoiceHeaderData === undefined || invoiceBodyData === undefined) {
       throw "You must provide a header and body sale data to print";
@@ -1431,6 +1433,159 @@ controller.printOrderSaleVoucher = (req, res) => {
       .text('F. ____________________________')
       .feed(1)
       .text('*** GRACIAS POR PREFERIRNOS ***')
+      .feed(2)
+      .cut()
+      .close((err) => {
+        if (err) {
+          res.json({ data: "Print error" });
+        } else {
+          res.json({ data: "Print success" });
+        }
+      });
+    });
+  } catch(err) {
+    res.status(500).json({ status: 500, message: 'Printer not found!', errorContent: err });
+  }
+}
+
+controller.printDispatchOrderVoucher = (req, res) => {
+  try {
+    const { useNetworkPrint } = req.query;
+    
+    let device;
+
+    if (+useNetworkPrint === 1) {
+      device = new escpos.Network('192.168.1.100', 9105);
+    } else {
+      device = new escpos.USB(vId, pId);
+    }
+
+    const options = { encoding: "857", width: 48 /* default */ }
+    const printer = new escpos.Printer(device, options);
+
+    const { invoiceHeaderData, invoiceBodyData } = req.body;
+
+    if (invoiceHeaderData === undefined || invoiceBodyData === undefined) {
+      throw "You must provide a header and body sale data to print";
+    }
+
+    const {
+      id: currentSaleId,
+      companyId,
+      orderNumber,
+      deliveryRouteId,
+      deliveryRouteName,
+      shiftcutId,
+      cashierId,
+      locationId,
+      locationName,
+      locationPhone,
+      locationAddress,
+      locationDepartmentName,
+      locationCityName,
+      locationDepartmentMhCode,
+      locationCityMhCode,
+      locationEmail,
+      ownerNit,
+      ownerNrc,
+      ownerName,
+      ownerActivityCode,
+      ownerActivityDescription,
+      ownerTradename,
+      establishmentType,
+      customerId,
+      documentDatetime,
+      documentTypeId,
+      documentTypeName,
+      paymentTypeId,
+      paymentTypeName,
+      status,
+      statusName,
+      statusColor,
+      total,
+      totalTaxes,
+      taxableSubTotal,
+      taxableSubTotalWithoutTaxes,
+      noTaxableSubTotal,
+      createdBy,
+      createdByFullname,
+      userPINCodeId,
+      userPINCodeFullname,
+      customerCode,
+      customerFullname,
+      customerAddress,
+      customerDui,
+      customerNit,
+      customerNrc,
+      customerBusinessLine,
+      customerOccupation,
+      customerDefPriceIndex,
+      customerDepartmentName,
+      customerCityName
+    } = invoiceHeaderData;
+
+    device.open(function(error){
+      printer
+      .font('A')
+      .align('CT')
+      .style('NORMAL')
+      .size(0, 0)
+      // .text('*** TICKET DE DESPACHO DE PRODUCTO ***')
+      // .text(ownerTradename || '')
+      .align('LT')
+      .tableCustom([
+        // { text: `DESPACHO N: ${currentSaleId}`, align: "LEFT", width: 0.99 },
+      ])
+      .text(`FECHA Y HORA: ${dayjs(documentDatetime).format('YYYY-MM-DD hh:mm:ss')}`)
+      // .text(`CLIENTE: ${customerFullname}`)
+
+      .feed(1) // LINE 9
+      .align('CT')
+      .tableCustom([
+        { text: `CANT.`, align: "LEFT", width: 0.20 },
+        { text: `DESCRIPCION`, align: "LEFT", width: 0.79 },
+      ])
+      .text('------------------------------------------------')
+      // .feed(1)
+      for (let i = 0; i < invoiceBodyData.length; i++) {
+        const {
+          orderSaleDetailId,
+          orderSaleId,
+          productId,
+          productCode,
+          productName,
+          categoryName,
+          brandName,
+          quantityFactorName,
+          quantityFactor,
+          unitPrice,
+          unitPriceNoTaxes,
+          unitCost,
+          unitCostNoTaxes,
+          subTotalCost,
+          totalCostTaxes,
+          totalCost,
+          quantity,
+          subTotal,
+          isVoided,
+          isActive,
+          taxesData,
+          totalTaxes,
+          taxableSubTotal,
+          taxableSubTotalWithoutTaxes,
+          noTaxableSubTotal
+        } = invoiceBodyData[i];
+
+        printer.style('U').tableCustom([
+          { text: `${Number(quantity).toFixed(2) || 0}`, align: "LEFT", width: 0.20 },
+          { text: `${productName || ""}`, align: "LEFT", width: 0.79 },
+        ]);
+
+        if((i + 1) < invoiceBodyData.length) printer.feed(1);
+      } // LINE 15
+      printer.style('NORMAL')
+      .align('CT')
+      .control('FF')
       .feed(2)
       .cut()
       .close((err) => {

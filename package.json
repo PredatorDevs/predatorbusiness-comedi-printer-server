@@ -25,5 +25,10 @@
     "nodemon": "^2.0.22",
     "ping": "^0.4.4",
     "usb": "^1.9.2"
+  },
+  "bin": "index.js",
+  "pkg": {
+    "targets": ["node18-win-x64"],
+    "outputPath": "dist"
   }
 }

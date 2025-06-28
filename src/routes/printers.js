@@ -13,6 +13,7 @@ const {
   printInternalSaleTicket,
   printDteVoucher,
   printOrderSaleVoucher,
+  printDispatchOrderVoucher,
   printCF,
   testPrinterConnection,
   testNetworkPrinterConnection,
@@ -35,6 +36,7 @@ router.post('/cfticket', printCFTicket);
 router.post('/internalsaleticket', printInternalSaleTicket);
 router.post('/dtevoucher', printDteVoucher);
 router.post('/ordersalevoucher', printOrderSaleVoucher);
+router.post('/dispatchordervoucher', printDispatchOrderVoucher);
 router.post('/printTicketKitchen', printTicketKitchen);
 router.post('/printTicketPreAccount', printTicketPreAccount);
 router.post('/printPackOff', printPackOff);
