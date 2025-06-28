@@ -41,6 +41,8 @@ router.post('/printTicketKitchen', printTicketKitchen);
 router.post('/printTicketPreAccount', printTicketPreAccount);
 router.post('/printPackOff', printPackOff);
 
-router.post('/print-sale-details-to-network-printer', printSaleDetailsToNetworkPrinter)
+router.post('/print-sale-details-to-network-printer', printSaleDetailsToNetworkPrinter);
+router.post('/settlement-x-ticket', printSettlementXTicket);
+router.post('/settlement-z-ticket', printSettlementZTicket);
 
 export default router;

@@ -2114,4 +2114,512 @@ controller.printSaleDetailsToNetworkPrinter = (req, res) => {
   }
 }
 
+controller.printSettlementXTicket = (req, res) => {
+  try {
+    const { useNetworkPrint } = req.query;
+    
+    let device;
+
+    if (+useNetworkPrint === 1) {
+      device = new escpos.Network('192.168.1.100', 9105);
+    } else {
+      device = new escpos.USB(vId, pId);
+    }
+    // const device  = new escpos.USB(vId, pId);
+    // const device = new escpos.Network('127.0.0.1', 9105);
+    const options = { encoding: "857", width: 48 /* default */ }
+    const printer = new escpos.Printer(device, options);
+
+    // invoiceHeaderData = { customerFullname, documentDatetime, customerAddress, customerDui, customerNit, customerPhone, totalSale, totalToLetters }
+    // invoiceBodyData = [{ quantity, description, unitPrice, subTotal }]
+    const { settlementData } = req.body;
+
+    if (settlementData === undefined) {
+      throw "You must provide a settlementData sale data to print";
+    }
+
+    const shiftcutData = settlementData[0];
+
+    const {
+      locationOwnerTradename,
+      locationOwnerName,
+      locationOwnerActivityCode,
+      locationOwnerActivityDescription,
+      locationOwnerNit,
+      locationOwnerNrc,
+      shiftcutDatetime,
+      shiftcutDatetimeFormatted,
+      openedByFullname,
+      closedByFullname,
+      cashierName,
+      shiftcutNumber
+    } = shiftcutData[0];
+
+    const ticketsXData = settlementData[1];
+
+    const {
+      label: ticketLabel,
+      numberOfTransactions: ticketNumberOfTransactions,
+      initialDocNumber: ticketInitialDocNumber,
+      finalDocNumber: ticketFinalDocNumber,
+      taxableTotal: ticketTaxableTotal,
+      noTaxableTotal: ticketNoTaxableTotal,
+      noSubjectTotal: ticketNoSubjectTotal,
+      total: ticketTotal
+    } = ticketsXData[0];
+
+    const cfXData = settlementData[2];
+
+    const {
+      label: cfLabel,
+      numberOfTransactions: cfNumberOfTransactions,
+      initialDocNumber: cfInitialDocNumber,
+      finalDocNumber: cfFinalDocNumber,
+      taxableTotal: cfTaxableTotal,
+      noTaxableTotal: cfNoTaxableTotal,
+      noSubjectTotal: cfNoSubjectTotal,
+      total: cfTotal
+    } = cfXData[0];
+
+    const ccfXData = settlementData[3];
+
+    const {
+      label: ccfLabel,
+      numberOfTransactions: ccfNumberOfTransactions,
+      initialDocNumber: ccfInitialDocNumber,
+      finalDocNumber: ccfFinalDocNumber,
+      taxableTotal: ccfTaxableTotal,
+      noTaxableTotal: ccfNoTaxableTotal,
+      noSubjectTotal: ccfNoSubjectTotal,
+      total: ccfTotal
+    } = ccfXData[0];
+    
+    // let encoder = new ReceiptPrinterEncoder({
+    //   language: 'esc-pos',
+    //   columns: 42,
+    //   feedBeforeCut: 0,
+    //   newline: '\n'
+    // });
+
+    device.open(function(error){
+      printer
+      .font('A')
+      .align('CT')
+      .style('NORMAL')
+      .size(0, 0)
+      .text('')
+      .text(`${locationOwnerName}`)
+      .text(`${locationOwnerTradename}`)
+      .text(`${locationOwnerActivityDescription}`)
+      .tableCustom([{ text: "NIT", align: "LEFT", width: 0.25 }, { text: `${locationOwnerNit || ''}`, align: "LEFT", width: 0.75 }])
+      .tableCustom([{ text: "NRC", align: "LEFT", width: 0.25 }, { text: `${locationOwnerNrc || ''}`, align: "LEFT", width: 0.75 }])
+      .tableCustom([{ text: "Caja", align: "LEFT", width: 0.25 }, { text: `${cashierName || ''}`, align: "LEFT", width: 0.75 }])
+      .tableCustom([{ text: "Turno", align: "LEFT", width: 0.25 }, { text: `${shiftcutNumber || ''}`, align: "LEFT", width: 0.75 }])
+      .tableCustom([{ text: "Fecha", align: "LEFT", width: 0.25 }, { text: `${shiftcutDatetimeFormatted || ''}`, align: "LEFT", width: 0.75 }])
+      .tableCustom([{ text: "Apertura", align: "LEFT", width: 0.25 }, { text: `${openedByFullname || ''}`, align: "LEFT", width: 0.75 }])
+      .tableCustom([{ text: "Cierra", align: "LEFT", width: 0.25 }, { text: `${closedByFullname || ''}`, align: "LEFT", width: 0.75 }])
+      .text('')
+      .text('TICKET X')
+      .text('')
+      .text('-----------------------------------------')
+      .tableCustom([{ text: `${ticketLabel}`, align: "LEFT", width: 0.50 }, { text: ``, align: "RIGHT", width: 0.50 }])
+      .tableCustom([{ text: `Venta Gravada:`, align: "LEFT", width: 0.50 }, { text: `${Number(ticketTaxableTotal || 0).toFixed(2)}`, align: "RIGHT", width: 0.50 }])
+      .tableCustom([{ text: `Venta Exenta:`, align: "LEFT", width: 0.50 }, { text: `${Number(ticketNoTaxableTotal || 0).toFixed(2)}`, align: "RIGHT", width: 0.50 }])
+      .tableCustom([{ text: `Venta No Sujeta:`, align: "LEFT", width: 0.50 }, { text: `${Number(ticketNoSubjectTotal || 0).toFixed(2)}`, align: "RIGHT", width: 0.50 }])
+      .tableCustom([{ text: `Total:`, align: "LEFT", width: 0.50 }, { text: `${Number(ticketTotal || 0).toFixed(2)}`, align: "RIGHT", width: 0.50 }])
+      .text('-----------------------------------------')
+      .tableCustom([{ text: `${cfLabel}`, align: "LEFT", width: 0.50 }, { text: ``, align: "RIGHT", width: 0.50 }])
+      .tableCustom([{ text: `Venta Gravada:`, align: "LEFT", width: 0.50 }, { text: `${Number(cfTaxableTotal || 0).toFixed(2)}`, align: "RIGHT", width: 0.50 }])
+      .tableCustom([{ text: `Venta Exenta:`, align: "LEFT", width: 0.50 }, { text: `${Number(cfNoTaxableTotal || 0).toFixed(2)}`, align: "RIGHT", width: 0.50 }])
+      .tableCustom([{ text: `Venta No Sujeta:`, align: "LEFT", width: 0.50 }, { text: `${Number(cfNoSubjectTotal || 0).toFixed(2)}`, align: "RIGHT", width: 0.50 }])
+      .tableCustom([{ text: `Total:`, align: "LEFT", width: 0.50 }, { text: `${Number(cfTotal || 0).toFixed(2)}`, align: "RIGHT", width: 0.50 }])
+      .text('-----------------------------------------')
+      .tableCustom([{ text: `${ccfLabel}`, align: "LEFT", width: 0.50 }, { text: ``, align: "RIGHT", width: 0.50 }])
+      .tableCustom([{ text: `Venta Gravada:`, align: "LEFT", width: 0.50 }, { text: `${Number(ccfTaxableTotal || 0).toFixed(2)}`, align: "RIGHT", width: 0.50 }])
+      .tableCustom([{ text: `Venta Exenta:`, align: "LEFT", width: 0.50 }, { text: `${Number(ccfNoTaxableTotal || 0).toFixed(2)}`, align: "RIGHT", width: 0.50 }])
+      .tableCustom([{ text: `Venta No Sujeta:`, align: "LEFT", width: 0.50 }, { text: `${Number(ccfNoSubjectTotal || 0).toFixed(2)}`, align: "RIGHT", width: 0.50 }])
+      .tableCustom([{ text: `Total:`, align: "LEFT", width: 0.50 }, { text: `${Number(ccfTotal || 0).toFixed(2)}`, align: "RIGHT", width: 0.50 }])
+      .text('-----------------------------------------')
+      .tableCustom([{ text: `TOTAL VENTAS`, align: "LEFT", width: 0.50 }, { text: `${Number(ccfTaxableTotal || 0).toFixed(2)}`, align: "RIGHT", width: 0.50 }])
+      .text('-----------------------------------------')
+      .tableCustom([{ text: `TRANSACCIONES`, align: "LEFT", width: 0.50 }, { text: `${Number(ccfTaxableTotal || 0).toFixed(2)}`, align: "RIGHT", width: 0.50 }])
+      .text('-----------------------------------------')
+      .tableCustom([{ text: `${ticketLabel}`, align: "LEFT", width: 0.50 }, { text: `${Number(ticketNumberOfTransactions || 0).toFixed(0)}`, align: "RIGHT", width: 0.50 }])
+      .tableCustom([{ text: `Inicial`, align: "LEFT", width: 0.50 }, { text: `${Number(ticketInitialDocNumber || 0).toFixed(0)}`, align: "RIGHT", width: 0.50 }])
+      .tableCustom([{ text: `Final`, align: "LEFT", width: 0.50 }, { text: `${Number(ticketFinalDocNumber || 0).toFixed(0)}`, align: "RIGHT", width: 0.50 }])
+      .text('-----------------------------------------')
+      .tableCustom([{ text: `${cfLabel}`, align: "LEFT", width: 0.50 }, { text: `${Number(cfNumberOfTransactions || 0).toFixed(0)}`, align: "RIGHT", width: 0.50 }])
+      .tableCustom([{ text: `Inicial`, align: "LEFT", width: 0.50 }, { text: `${Number(cfInitialDocNumber || 0).toFixed(0)}`, align: "RIGHT", width: 0.50 }])
+      .tableCustom([{ text: `Final`, align: "LEFT", width: 0.50 }, { text: `${Number(cfFinalDocNumber || 0).toFixed(0)}`, align: "RIGHT", width: 0.50 }])
+      .text('-----------------------------------------')
+      .tableCustom([{ text: `${ccfLabel}`, align: "LEFT", width: 0.50 }, { text: `${Number(ccfNumberOfTransactions || 0).toFixed(0)}`, align: "RIGHT", width: 0.50 }])
+      .tableCustom([{ text: `Inicial`, align: "LEFT", width: 0.50 }, { text: `${Number(ccfInitialDocNumber || 0).toFixed(0)}`, align: "RIGHT", width: 0.50 }])
+      .tableCustom([{ text: `Final`, align: "LEFT", width: 0.50 }, { text: `${Number(ccfFinalDocNumber || 0).toFixed(0)}`, align: "RIGHT", width: 0.50 }])
+      .feed(2)
+      .cut()
+      .close((err) => {
+        if (err) {
+          res.json({ data: "Print error" });
+        } else {
+          res.json({ data: "Print success" });
+        }
+      });
+    });
+
+    // // let commands = encoder.initialize()
+    // encoder.initialize()
+    // // .raw([0x1B, 0x3D, 0x01])
+    // .raw([0x1B, 0x63, 0x30, 0x03])
+    // .line('')
+    // .align('center')
+    // .line(`${locationOwnerName}`)
+    // .line(`${locationOwnerTradename}`)
+    // .line(`${locationOwnerActivityDescription}`)
+    // .line('')
+    // .align('left')
+    // .line(`${String('NIT:').padEnd(12)}${String(locationOwnerNit).padStart(26)}`)
+    // .line(`${String('NRC:').padEnd(12)}${String(locationOwnerNrc).padStart(26)}`)
+    // .line(`${String('Caja:').padEnd(12)}${String(cashierName).padStart(26)}`)
+    // .line(`${String('Turno:').padEnd(12)}${String(shiftcutNumber).padStart(26)}`)
+    // .line(`${String('Fecha:').padEnd(12)}${String(shiftcutDatetimeFormatted).padStart(26)}`)
+    // .line(`${String('Apertura:').padEnd(12)}${String(openedByFullname).padStart(26)}`)
+    // .line(`${String('Cierra:').padEnd(12)}${String(closedByFullname).padStart(26)}`)
+    // .align('center')
+    // .line('TICKET X')
+    // .align('left')
+    // .line('----------------------------------------')
+    // .line(`${String(ticketLabel).padEnd(18)}${String('').padStart(20)}`)
+    // .line(`${String('Venta Gravada:').padEnd(18)}${String(Number(ticketTaxableTotal || 0).toFixed(2)).padStart(20)}`)
+    // .line(`${String('Venta Exenta:').padEnd(18)}${String(Number(ticketNoTaxableTotal || 0).toFixed(2)).padStart(20)}`)
+    // .line(`${String('Venta No Sujeta:').padEnd(18)}${String(Number(ticketNoSubjectTotal || 0).toFixed(2)).padStart(20)}`)
+    // .line(`${String('Total:').padEnd(18)}${String(Number(ticketTotal || 0).toFixed(2)).padStart(20)}`)
+    // .line('----------------------------------------')
+    // .line(`${String(cfLabel).padEnd(18)}${String('').padStart(20)}`)
+    // .line(`${String('Venta Gravada:').padEnd(18)}${String(Number(cfTaxableTotal || 0).toFixed(2)).padStart(20)}`)
+    // .line(`${String('Venta Exenta:').padEnd(18)}${String(Number(cfNoTaxableTotal || 0).toFixed(2)).padStart(20)}`)
+    // .line(`${String('Venta No Sujeta:').padEnd(18)}${String(Number(cfNoSubjectTotal || 0).toFixed(2)).padStart(20)}`)
+    // .line(`${String('Total:').padEnd(18)}${String(Number(cfTotal || 0).toFixed(2)).padStart(20)}`)
+    // .line('----------------------------------------')
+    // .line(`${String(ccfLabel).padEnd(18)}${String('').padStart(20)}`)
+    // .line(`${String('Venta Gravada:').padEnd(18)}${String(Number(ccfTaxableTotal || 0).toFixed(2)).padStart(20)}`)
+    // .line(`${String('Venta Exenta:').padEnd(18)}${String(Number(ccfNoTaxableTotal || 0).toFixed(2)).padStart(20)}`)
+    // .line(`${String('Venta No Sujeta:').padEnd(18)}${String(Number(ccfNoSubjectTotal || 0).toFixed(2)).padStart(20)}`)
+    // .line(`${String('Total:').padEnd(18)}${String(Number(ccfTotal || 0).toFixed(2)).padStart(20)}`)
+    // .line('----------------------------------------')
+    // .line(`${String('TOTAL VENTAS:').padEnd(18)}${String(Number((+ticketTotal || 0) + (+cfTotal || 0) + (+ccfTotal || 0)).toFixed(2)).padStart(20)}`)
+    // .line('----------------------------------------')
+    // .line(`${String('Transacciones:').padEnd(18)}${String(Number((ticketNumberOfTransactions || 0) + (cfNumberOfTransactions || 0) + (ccfNumberOfTransactions || 0)).toFixed(0)).padStart(20)}`)
+    // .line('----------------------------------------')
+    // .line(`${String(ticketLabel).padEnd(18)}${String(Number(ticketNumberOfTransactions).toFixed(0)).padStart(20)}`)
+    // .line(`${String('Inicial').padEnd(18)}${String(Number(ticketInitialDocNumber).toFixed(0)).padStart(20)}`)
+    // .line(`${String('Final').padEnd(18)}${String(Number(ticketFinalDocNumber).toFixed(0)).padStart(20)}`)
+    // .line('----------------------------------------')
+    // .line(`${String(cfLabel).padEnd(18)}${String(Number(cfNumberOfTransactions).toFixed(0)).padStart(20)}`)
+    // .line(`${String('Inicial').padEnd(18)}${String(Number(cfInitialDocNumber).toFixed(0)).padStart(20)}`)
+    // .line(`${String('Final').padEnd(18)}${String(Number(cfFinalDocNumber).toFixed(0)).padStart(20)}`)
+    // .line('----------------------------------------')
+    // .line(`${String(ccfLabel).padEnd(18)}${String(Number(ccfNumberOfTransactions).toFixed(0)).padStart(20)}`)
+    // .line(`${String('Inicial').padEnd(18)}${String(Number(ccfInitialDocNumber).toFixed(0)).padStart(20)}`)
+    // .line(`${String('Final').padEnd(18)}${String(Number(ccfFinalDocNumber).toFixed(0)).padStart(20)}`)
+    // .line('')
+    // .line('')
+    // .line('')
+    // .line('')
+    // .line('')
+    // .line('')
+    // .raw(escposcommands.alternativeCut)
+    // .line('')
+    // .line('')
+    // .line('');
+    // // .encode();
+
+    // let commands = encoder.encode();
+
+    // const pcName = 'DESKTOP-SJEKD0F';
+    // const printerName = 'Epson TM-U950 Receipt';
+
+    // const printerPath = `\\\\${pcName}\\${printerName}`;
+
+    // const tempFile = 'comandos_print.bin';
+    // // const tempFile = 'temp_comandos.txt';
+    // // const cutCommand = new Uint8Array([0x1B, 0x69]);
+    // fs.writeFileSync(tempFile, Buffer.from(commands), 'binary');
+    // // fs.writeFileSync(tempFile, `${commands}`, 'binary');
+
+    // const command = `copy /b ${tempFile} "${printerPath}"`;
+
+    // exec(command, (error, stdout, stderr) => {
+    //   if (error) {
+    //     console.log(`Error al imprimir ${error.message}`);
+    //     return;
+    //   }
+    //   if (stderr) {
+    //     console.log(`Error ${stderr}`);
+    //     return;
+    //   }
+    //   console.log('Impresor completa');
+    //   return;
+    // });
+
+    // res.json({ data: "Printer connection success!" });
+  } catch(err) {
+    console.log(err);
+    res.status(500).json({ status: 500, message: 'Printer not found!', errorContent: err });
+  }
+}
+
+controller.printSettlementZTicket = (req, res) => {
+  try {
+    const { useNetworkPrint } = req.query;
+    
+    let device;
+
+    if (+useNetworkPrint === 1) {
+      device = new escpos.Network('192.168.1.100', 9105);
+    } else {
+      device = new escpos.USB(vId, pId);
+    }
+    // const device  = new escpos.USB(vId, pId);
+    // const device = new escpos.Network('127.0.0.1', 9105);
+    const options = { encoding: "857", width: 48 /* default */ }
+    const printer = new escpos.Printer(device, options);
+
+    // invoiceHeaderData = { customerFullname, documentDatetime, customerAddress, customerDui, customerNit, customerPhone, totalSale, totalToLetters }
+    // invoiceBodyData = [{ quantity, description, unitPrice, subTotal }]
+    const { settlementData } = req.body;
+
+    if (settlementData === undefined) {
+      throw "You must provide a settlementData sale data to print";
+    }
+
+    const shiftcutData = settlementData[0];
+
+    const {
+      locationOwnerTradename,
+      locationOwnerName,
+      locationOwnerActivityCode,
+      locationOwnerActivityDescription,
+      locationOwnerNit,
+      locationOwnerNrc,
+      shiftcutDatetime,
+      shiftcutDatetimeFormatted,
+      openedByFullname,
+      closedByFullname,
+      cashierName,
+      shiftcutNumber
+    } = shiftcutData[0];
+
+    const ticketsXData = settlementData[1];
+
+    const {
+      label: ticketLabel,
+      numberOfTransactions: ticketNumberOfTransactions,
+      initialDocNumber: ticketInitialDocNumber,
+      finalDocNumber: ticketFinalDocNumber,
+      taxableTotal: ticketTaxableTotal,
+      noTaxableTotal: ticketNoTaxableTotal,
+      noSubjectTotal: ticketNoSubjectTotal,
+      total: ticketTotal
+    } = ticketsXData[0];
+
+    const cfXData = settlementData[2];
+
+    const {
+      label: cfLabel,
+      numberOfTransactions: cfNumberOfTransactions,
+      initialDocNumber: cfInitialDocNumber,
+      finalDocNumber: cfFinalDocNumber,
+      taxableTotal: cfTaxableTotal,
+      noTaxableTotal: cfNoTaxableTotal,
+      noSubjectTotal: cfNoSubjectTotal,
+      total: cfTotal
+    } = cfXData[0];
+
+    const ccfXData = settlementData[3];
+
+    const {
+      label: ccfLabel,
+      numberOfTransactions: ccfNumberOfTransactions,
+      initialDocNumber: ccfInitialDocNumber,
+      finalDocNumber: ccfFinalDocNumber,
+      taxableTotal: ccfTaxableTotal,
+      noTaxableTotal: ccfNoTaxableTotal,
+      noSubjectTotal: ccfNoSubjectTotal,
+      total: ccfTotal
+    } = ccfXData[0];
+    
+    // let encoder = new ReceiptPrinterEncoder({
+    //   language: 'esc-pos',
+    //   columns: 42,
+    //   feedBeforeCut: 0,
+    //   newline: '\n'
+    // });
+
+    device.open(function(error){
+      printer
+      .font('A')
+      .align('CT')
+      .style('NORMAL')
+      .size(0, 0)
+      .text('')
+      .text(`${locationOwnerName}`)
+      .text(`${locationOwnerTradename}`)
+      .text(`${locationOwnerActivityDescription}`)
+      .tableCustom([{ text: "NIT", align: "LEFT", width: 0.25 }, { text: `${locationOwnerNit || ''}`, align: "LEFT", width: 0.75 }])
+      .tableCustom([{ text: "NRC", align: "LEFT", width: 0.25 }, { text: `${locationOwnerNrc || ''}`, align: "LEFT", width: 0.75 }])
+      .tableCustom([{ text: "Caja", align: "LEFT", width: 0.25 }, { text: `${cashierName || ''}`, align: "LEFT", width: 0.75 }])
+      .tableCustom([{ text: "Turno", align: "LEFT", width: 0.25 }, { text: `${shiftcutNumber || ''}`, align: "LEFT", width: 0.75 }])
+      .tableCustom([{ text: "Fecha", align: "LEFT", width: 0.25 }, { text: `${shiftcutDatetimeFormatted || ''}`, align: "LEFT", width: 0.75 }])
+      .tableCustom([{ text: "Apertura", align: "LEFT", width: 0.25 }, { text: `${openedByFullname || ''}`, align: "LEFT", width: 0.75 }])
+      .tableCustom([{ text: "Cierra", align: "LEFT", width: 0.25 }, { text: `${closedByFullname || ''}`, align: "LEFT", width: 0.75 }])
+      .text('')
+      .text('TICKET Z')
+      .text('')
+      .text('-----------------------------------------')
+      .tableCustom([{ text: `${ticketLabel}`, align: "LEFT", width: 0.50 }, { text: ``, align: "RIGHT", width: 0.50 }])
+      .tableCustom([{ text: `Venta Gravada:`, align: "LEFT", width: 0.50 }, { text: `${Number(ticketTaxableTotal || 0).toFixed(2)}`, align: "RIGHT", width: 0.50 }])
+      .tableCustom([{ text: `Venta Exenta:`, align: "LEFT", width: 0.50 }, { text: `${Number(ticketNoTaxableTotal || 0).toFixed(2)}`, align: "RIGHT", width: 0.50 }])
+      .tableCustom([{ text: `Venta No Sujeta:`, align: "LEFT", width: 0.50 }, { text: `${Number(ticketNoSubjectTotal || 0).toFixed(2)}`, align: "RIGHT", width: 0.50 }])
+      .tableCustom([{ text: `Total:`, align: "LEFT", width: 0.50 }, { text: `${Number(ticketTotal || 0).toFixed(2)}`, align: "RIGHT", width: 0.50 }])
+      .text('-----------------------------------------')
+      .tableCustom([{ text: `${cfLabel}`, align: "LEFT", width: 0.50 }, { text: ``, align: "RIGHT", width: 0.50 }])
+      .tableCustom([{ text: `Venta Gravada:`, align: "LEFT", width: 0.50 }, { text: `${Number(cfTaxableTotal || 0).toFixed(2)}`, align: "RIGHT", width: 0.50 }])
+      .tableCustom([{ text: `Venta Exenta:`, align: "LEFT", width: 0.50 }, { text: `${Number(cfNoTaxableTotal || 0).toFixed(2)}`, align: "RIGHT", width: 0.50 }])
+      .tableCustom([{ text: `Venta No Sujeta:`, align: "LEFT", width: 0.50 }, { text: `${Number(cfNoSubjectTotal || 0).toFixed(2)}`, align: "RIGHT", width: 0.50 }])
+      .tableCustom([{ text: `Total:`, align: "LEFT", width: 0.50 }, { text: `${Number(cfTotal || 0).toFixed(2)}`, align: "RIGHT", width: 0.50 }])
+      .text('-----------------------------------------')
+      .tableCustom([{ text: `${ccfLabel}`, align: "LEFT", width: 0.50 }, { text: ``, align: "RIGHT", width: 0.50 }])
+      .tableCustom([{ text: `Venta Gravada:`, align: "LEFT", width: 0.50 }, { text: `${Number(ccfTaxableTotal || 0).toFixed(2)}`, align: "RIGHT", width: 0.50 }])
+      .tableCustom([{ text: `Venta Exenta:`, align: "LEFT", width: 0.50 }, { text: `${Number(ccfNoTaxableTotal || 0).toFixed(2)}`, align: "RIGHT", width: 0.50 }])
+      .tableCustom([{ text: `Venta No Sujeta:`, align: "LEFT", width: 0.50 }, { text: `${Number(ccfNoSubjectTotal || 0).toFixed(2)}`, align: "RIGHT", width: 0.50 }])
+      .tableCustom([{ text: `Total:`, align: "LEFT", width: 0.50 }, { text: `${Number(ccfTotal || 0).toFixed(2)}`, align: "RIGHT", width: 0.50 }])
+      .text('-----------------------------------------')
+      .tableCustom([{ text: `TOTAL VENTAS`, align: "LEFT", width: 0.50 }, { text: `${Number(ccfTaxableTotal || 0).toFixed(2)}`, align: "RIGHT", width: 0.50 }])
+      .text('-----------------------------------------')
+      .tableCustom([{ text: `TRANSACCIONES`, align: "LEFT", width: 0.50 }, { text: `${Number(ccfTaxableTotal || 0).toFixed(2)}`, align: "RIGHT", width: 0.50 }])
+      .text('-----------------------------------------')
+      .tableCustom([{ text: `${ticketLabel}`, align: "LEFT", width: 0.50 }, { text: `${Number(ticketNumberOfTransactions || 0).toFixed(0)}`, align: "RIGHT", width: 0.50 }])
+      .tableCustom([{ text: `Inicial`, align: "LEFT", width: 0.50 }, { text: `${Number(ticketInitialDocNumber || 0).toFixed(0)}`, align: "RIGHT", width: 0.50 }])
+      .tableCustom([{ text: `Final`, align: "LEFT", width: 0.50 }, { text: `${Number(ticketFinalDocNumber || 0).toFixed(0)}`, align: "RIGHT", width: 0.50 }])
+      .text('-----------------------------------------')
+      .tableCustom([{ text: `${cfLabel}`, align: "LEFT", width: 0.50 }, { text: `${Number(cfNumberOfTransactions || 0).toFixed(0)}`, align: "RIGHT", width: 0.50 }])
+      .tableCustom([{ text: `Inicial`, align: "LEFT", width: 0.50 }, { text: `${Number(cfInitialDocNumber || 0).toFixed(0)}`, align: "RIGHT", width: 0.50 }])
+      .tableCustom([{ text: `Final`, align: "LEFT", width: 0.50 }, { text: `${Number(cfFinalDocNumber || 0).toFixed(0)}`, align: "RIGHT", width: 0.50 }])
+      .text('-----------------------------------------')
+      .tableCustom([{ text: `${ccfLabel}`, align: "LEFT", width: 0.50 }, { text: `${Number(ccfNumberOfTransactions || 0).toFixed(0)}`, align: "RIGHT", width: 0.50 }])
+      .tableCustom([{ text: `Inicial`, align: "LEFT", width: 0.50 }, { text: `${Number(ccfInitialDocNumber || 0).toFixed(0)}`, align: "RIGHT", width: 0.50 }])
+      .tableCustom([{ text: `Final`, align: "LEFT", width: 0.50 }, { text: `${Number(ccfFinalDocNumber || 0).toFixed(0)}`, align: "RIGHT", width: 0.50 }])
+      .feed(2)
+      .cut()
+      .close((err) => {
+        if (err) {
+          res.json({ data: "Print error" });
+        } else {
+          res.json({ data: "Print success" });
+        }
+      });
+    });
+
+    // // let commands = encoder.initialize()
+    // encoder.initialize()
+    // // .raw([0x1B, 0x3D, 0x01])
+    // .raw([0x1B, 0x63, 0x30, 0x03])
+    // .line('')
+    // .align('center')
+    // .line(`${locationOwnerName}`)
+    // .line(`${locationOwnerTradename}`)
+    // .line(`${locationOwnerActivityDescription}`)
+    // .line('')
+    // .align('left')
+    // .line(`${String('NIT:').padEnd(12)}${String(locationOwnerNit).padStart(26)}`)
+    // .line(`${String('NRC:').padEnd(12)}${String(locationOwnerNrc).padStart(26)}`)
+    // .line(`${String('Caja:').padEnd(12)}${String(cashierName).padStart(26)}`)
+    // .line(`${String('Turno:').padEnd(12)}${String(shiftcutNumber).padStart(26)}`)
+    // .line(`${String('Fecha:').padEnd(12)}${String(shiftcutDatetimeFormatted).padStart(26)}`)
+    // .line(`${String('Apertura:').padEnd(12)}${String(openedByFullname).padStart(26)}`)
+    // .line(`${String('Cierra:').padEnd(12)}${String(closedByFullname).padStart(26)}`)
+    // .align('center')
+    // .line('TICKET X')
+    // .align('left')
+    // .line('----------------------------------------')
+    // .line(`${String(ticketLabel).padEnd(18)}${String('').padStart(20)}`)
+    // .line(`${String('Venta Gravada:').padEnd(18)}${String(Number(ticketTaxableTotal || 0).toFixed(2)).padStart(20)}`)
+    // .line(`${String('Venta Exenta:').padEnd(18)}${String(Number(ticketNoTaxableTotal || 0).toFixed(2)).padStart(20)}`)
+    // .line(`${String('Venta No Sujeta:').padEnd(18)}${String(Number(ticketNoSubjectTotal || 0).toFixed(2)).padStart(20)}`)
+    // .line(`${String('Total:').padEnd(18)}${String(Number(ticketTotal || 0).toFixed(2)).padStart(20)}`)
+    // .line('----------------------------------------')
+    // .line(`${String(cfLabel).padEnd(18)}${String('').padStart(20)}`)
+    // .line(`${String('Venta Gravada:').padEnd(18)}${String(Number(cfTaxableTotal || 0).toFixed(2)).padStart(20)}`)
+    // .line(`${String('Venta Exenta:').padEnd(18)}${String(Number(cfNoTaxableTotal || 0).toFixed(2)).padStart(20)}`)
+    // .line(`${String('Venta No Sujeta:').padEnd(18)}${String(Number(cfNoSubjectTotal || 0).toFixed(2)).padStart(20)}`)
+    // .line(`${String('Total:').padEnd(18)}${String(Number(cfTotal || 0).toFixed(2)).padStart(20)}`)
+    // .line('----------------------------------------')
+    // .line(`${String(ccfLabel).padEnd(18)}${String('').padStart(20)}`)
+    // .line(`${String('Venta Gravada:').padEnd(18)}${String(Number(ccfTaxableTotal || 0).toFixed(2)).padStart(20)}`)
+    // .line(`${String('Venta Exenta:').padEnd(18)}${String(Number(ccfNoTaxableTotal || 0).toFixed(2)).padStart(20)}`)
+    // .line(`${String('Venta No Sujeta:').padEnd(18)}${String(Number(ccfNoSubjectTotal || 0).toFixed(2)).padStart(20)}`)
+    // .line(`${String('Total:').padEnd(18)}${String(Number(ccfTotal || 0).toFixed(2)).padStart(20)}`)
+    // .line('----------------------------------------')
+    // .line(`${String('TOTAL VENTAS:').padEnd(18)}${String(Number((+ticketTotal || 0) + (+cfTotal || 0) + (+ccfTotal || 0)).toFixed(2)).padStart(20)}`)
+    // .line('----------------------------------------')
+    // .line(`${String('Transacciones:').padEnd(18)}${String(Number((ticketNumberOfTransactions || 0) + (cfNumberOfTransactions || 0) + (ccfNumberOfTransactions || 0)).toFixed(0)).padStart(20)}`)
+    // .line('----------------------------------------')
+    // .line(`${String(ticketLabel).padEnd(18)}${String(Number(ticketNumberOfTransactions).toFixed(0)).padStart(20)}`)
+    // .line(`${String('Inicial').padEnd(18)}${String(Number(ticketInitialDocNumber).toFixed(0)).padStart(20)}`)
+    // .line(`${String('Final').padEnd(18)}${String(Number(ticketFinalDocNumber).toFixed(0)).padStart(20)}`)
+    // .line('----------------------------------------')
+    // .line(`${String(cfLabel).padEnd(18)}${String(Number(cfNumberOfTransactions).toFixed(0)).padStart(20)}`)
+    // .line(`${String('Inicial').padEnd(18)}${String(Number(cfInitialDocNumber).toFixed(0)).padStart(20)}`)
+    // .line(`${String('Final').padEnd(18)}${String(Number(cfFinalDocNumber).toFixed(0)).padStart(20)}`)
+    // .line('----------------------------------------')
+    // .line(`${String(ccfLabel).padEnd(18)}${String(Number(ccfNumberOfTransactions).toFixed(0)).padStart(20)}`)
+    // .line(`${String('Inicial').padEnd(18)}${String(Number(ccfInitialDocNumber).toFixed(0)).padStart(20)}`)
+    // .line(`${String('Final').padEnd(18)}${String(Number(ccfFinalDocNumber).toFixed(0)).padStart(20)}`)
+    // .line('')
+    // .line('')
+    // .line('')
+    // .line('')
+    // .line('')
+    // .line('')
+    // .raw(escposcommands.alternativeCut)
+    // .line('')
+    // .line('')
+    // .line('');
+    // // .encode();
+
+    // let commands = encoder.encode();
+
+    // const pcName = 'DESKTOP-SJEKD0F';
+    // const printerName = 'Epson TM-U950 Receipt';
+
+    // const printerPath = `\\\\${pcName}\\${printerName}`;
+
+    // const tempFile = 'comandos_print.bin';
+    // // const tempFile = 'temp_comandos.txt';
+    // // const cutCommand = new Uint8Array([0x1B, 0x69]);
+    // fs.writeFileSync(tempFile, Buffer.from(commands), 'binary');
+    // // fs.writeFileSync(tempFile, `${commands}`, 'binary');
+
+    // const command = `copy /b ${tempFile} "${printerPath}"`;
+
+    // exec(command, (error, stdout, stderr) => {
+    //   if (error) {
+    //     console.log(`Error al imprimir ${error.message}`);
+    //     return;
+    //   }
+    //   if (stderr) {
+    //     console.log(`Error ${stderr}`);
+    //     return;
+    //   }
+    //   console.log('Impresor completa');
+    //   return;
+    // });
+
+    // res.json({ data: "Printer connection success!" });
+  } catch(err) {
+    console.log(err);
+    res.status(500).json({ status: 500, message: 'Printer not found!', errorContent: err });
+  }
+}
+
 module.exports = { controller };
