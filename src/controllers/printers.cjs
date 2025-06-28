@@ -2117,11 +2117,12 @@ controller.printSaleDetailsToNetworkPrinter = (req, res) => {
 controller.printSettlementXTicket = (req, res) => {
   try {
     const { useNetworkPrint } = req.query;
+    const { settlementData, cashierPrinterIp, cashierPrinterPort } = req.body;
     
     let device;
 
     if (+useNetworkPrint === 1) {
-      device = new escpos.Network('192.168.1.100', 9105);
+      device = new escpos.Network(cashierPrinterIp || '192.168.1.100', cashierPrinterPort || 9105);
     } else {
       device = new escpos.USB(vId, pId);
     }
@@ -2132,7 +2133,6 @@ controller.printSettlementXTicket = (req, res) => {
 
     // invoiceHeaderData = { customerFullname, documentDatetime, customerAddress, customerDui, customerNit, customerPhone, totalSale, totalToLetters }
     // invoiceBodyData = [{ quantity, description, unitPrice, subTotal }]
-    const { settlementData } = req.body;
 
     if (settlementData === undefined) {
       throw "You must provide a settlementData sale data to print";
@@ -2371,11 +2371,12 @@ controller.printSettlementXTicket = (req, res) => {
 controller.printSettlementZTicket = (req, res) => {
   try {
     const { useNetworkPrint } = req.query;
-    
+    const { settlementData, cashierPrinterIp, cashierPrinterPort } = req.body;
+
     let device;
 
     if (+useNetworkPrint === 1) {
-      device = new escpos.Network('192.168.1.100', 9105);
+      device = new escpos.Network(cashierPrinterIp || '192.168.1.100', cashierPrinterPort || 9105);
     } else {
       device = new escpos.USB(vId, pId);
     }
@@ -2386,7 +2387,6 @@ controller.printSettlementZTicket = (req, res) => {
 
     // invoiceHeaderData = { customerFullname, documentDatetime, customerAddress, customerDui, customerNit, customerPhone, totalSale, totalToLetters }
     // invoiceBodyData = [{ quantity, description, unitPrice, subTotal }]
-    const { settlementData } = req.body;
 
     if (settlementData === undefined) {
       throw "You must provide a settlementData sale data to print";

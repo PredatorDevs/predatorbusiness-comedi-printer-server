@@ -20,7 +20,9 @@ const {
   printTestPage,
   printGuideLines,
   printCharLine,
-  printSaleDetailsToNetworkPrinter
+  printSaleDetailsToNetworkPrinter,
+  printSettlementXTicket,
+  printSettlementZTicket
 } = controller;
 
 router.get('/print-guide-lines', printGuideLines);
