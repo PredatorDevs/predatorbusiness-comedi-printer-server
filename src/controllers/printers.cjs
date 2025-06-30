@@ -965,6 +965,7 @@ controller.printDteVoucher = (req, res) => {
     total,
     totalInLetters,
     totalTaxes,
+    tourismTaxAmount,
     transmissionModel,
     transmissionModelName,
     transmissionType,
@@ -1040,6 +1041,7 @@ controller.printDteVoucher = (req, res) => {
           unitPriceIva,
           unitPriceFovial,
           unitPriceCotrans,
+          unitPriceTourism,
           unitCost,
           unitCostNoTaxes,
           subTotalCost,
@@ -1053,6 +1055,7 @@ controller.printDteVoucher = (req, res) => {
           ivaTaxAmount,
           fovialTaxAmount,
           cotransTaxAmount,
+          tourismTaxAmount,
           totalTaxes,
           taxableSubTotal,
           taxableSubTotalWithoutTaxes,
@@ -1072,8 +1075,8 @@ controller.printDteVoucher = (req, res) => {
         printer.style('U').tableCustom([
           // { text: `${Number(invoiceBodyData[i].quantity).toFixed(0) || 0}`, align: "LEFT", width: 0.15 },
           // { text: `${"UNID"} x`, align: "LEFT", width: 0.25 },
-          { text: `${Number(quantity).toFixed(4) || 0} x $${(+unitPrice - (+unitPriceFovial + +unitPriceCotrans + (isNoTaxableOperation ? +unitPriceIva : 0))).toFixed(4) || 0}`, align: "LEFT", width: 0.50 },
-          { text: `${(isNoTaxableOperation === 1 ? (+noTaxableSubTotal - +ivaTaxAmount - +fovialTaxAmount - +cotransTaxAmount) : (+taxableSubTotal - ((documentTypeId === 1 || documentTypeId === 2) ? 0 : +ivaTaxAmount) - +fovialTaxAmount - +cotransTaxAmount)).toFixed(4) || 0}`, align: "RIGHT", width: 0.50 }
+          { text: `${Number(quantity).toFixed(4) || 0} x $${(+unitPrice - (+unitPriceFovial + +unitPriceCotrans + +unitPriceTourism + (isNoTaxableOperation ? +unitPriceIva : 0))).toFixed(4) || 0}`, align: "LEFT", width: 0.50 },
+          { text: `${(isNoTaxableOperation === 1 ? (+noTaxableSubTotal - +ivaTaxAmount - +fovialTaxAmount - +cotransTaxAmount - +tourismTaxAmount) : (+taxableSubTotal - ((documentTypeId === 1 || documentTypeId === 2) ? 0 : +ivaTaxAmount) - +fovialTaxAmount - +cotransTaxAmount - +tourismTaxAmount)).toFixed(4) || 0}`, align: "RIGHT", width: 0.50 }
         ]);
 
         if((i + 1) < invoiceBodyData.length) printer.feed(1);
@@ -1086,7 +1089,7 @@ controller.printDteVoucher = (req, res) => {
         { text: `GRAVADO`, align: "RIGHT", width: 0.75 },
         // { text: ``, align: "LEFT", width: 0.25 },
         // { text: ``, align: "RIGHT", width: 0.25 },
-        { text: `${(isNoTaxableOperation ? 0 : taxableSubTotal - ((+fovialTaxAmount + +cotransTaxAmount + ((documentTypeId === 1 || documentTypeId === 2) ? 0 : +ivaTaxAmount)) || 0)).toFixed(2) || 0}`, align: "RIGHT", width: 0.25 }
+        { text: `${(isNoTaxableOperation ? 0 : taxableSubTotal - ((+fovialTaxAmount + +cotransTaxAmount + +tourismTaxAmount + ((documentTypeId === 1 || documentTypeId === 2) ? 0 : +ivaTaxAmount)) || 0)).toFixed(2) || 0}`, align: "RIGHT", width: 0.25 }
       ])
       .tableCustom([
         { text: `EXENTO`, align: "RIGHT", width: 0.75 },
@@ -1098,7 +1101,7 @@ controller.printDteVoucher = (req, res) => {
         { text: `SUMA TOTAL DE OPERACIONES`, align: "RIGHT", width: 0.75 },
         // { text: ``, align: "LEFT", width: 0.25 },
         // { text: ``, align: "RIGHT", width: 0.25 },
-        { text: `${(isNoTaxableOperation ? taxableSubTotalWithoutTaxes : taxableSubTotal - ((+fovialTaxAmount + +cotransTaxAmount + ((documentTypeId === 1 || documentTypeId === 2) ? 0 : +ivaTaxAmount)))).toFixed(2) || 0}`, align: "RIGHT", width: 0.25 }
+        { text: `${(isNoTaxableOperation ? taxableSubTotalWithoutTaxes : taxableSubTotal - ((+fovialTaxAmount + +cotransTaxAmount + +tourismTaxAmount + ((documentTypeId === 1 || documentTypeId === 2) ? 0 : +ivaTaxAmount)))).toFixed(2) || 0}`, align: "RIGHT", width: 0.25 }
       ]);
       if (!(documentTypeId === 1 || documentTypeId === 2)) {
         printer.tableCustom([
@@ -1140,6 +1143,14 @@ controller.printDteVoucher = (req, res) => {
           // { text: ``, align: "LEFT", width: 0.25 },
           // { text: ``, align: "RIGHT", width: 0.25 },
           { text: `${Number(cotransTaxAmount).toFixed(2) || 0}`, align: "RIGHT", width: 0.25 }
+        ]);
+      }
+      if (+tourismTaxAmount !== null && +tourismTaxAmount > 0) {
+        printer.tableCustom([
+          { text: `TURISMO (5%)`, align: "RIGHT", width: 0.75 },
+          // { text: ``, align: "LEFT", width: 0.25 },
+          // { text: ``, align: "RIGHT", width: 0.25 },
+          { text: `${Number(tourismTaxAmount).toFixed(2) || 0}`, align: "RIGHT", width: 0.25 }
         ]);
       }
       printer.tableCustom([
