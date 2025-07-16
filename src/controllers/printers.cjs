@@ -23,6 +23,72 @@ const pId = "8214";
 const matrix_vId = "1203";
 const matrix_pId = "17717";
 
+controller.printManager = async (req, res) => {
+  try {
+    const { ip, name, port, details, place } = req.body;
+
+    const device = new escpos.Network(ip, port);
+    const options = { encoding: "857", width: 56 }
+    const printer = new escpos.Printer(device, options);
+
+    const now = new Date();
+    const date = now.toLocaleDateString('es-SV', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric'
+    });
+    const time = now.toLocaleTimeString('en-US', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true
+    });
+
+    function openDevice(device) {
+      return new Promise((resolve, reject) => {
+        device.open((error) => {
+          if (error) return reject(error);
+          resolve();
+        });
+      });
+    }
+
+    await openDevice(device);
+
+    printer
+      .font('A')
+      .align('LT')
+      .style('NORMAL')
+      .size(0, 0)
+      .text('-----------------------------------------')
+      .style('B')
+      .text(`${place.locationname}`)
+      .style('NORMAL')
+      .text('-----------------------------------------')
+      .text(`Ticket No. ${place.orderId}`)
+      .text(`IMPRESURA:  ${name}`)
+      .text(`LUGAR: ${place.placetypename}`)
+      .text(`CLIENTE: ${place.customerComplementaryName}`)
+      .text(`FECHA: ${date}          HORA: ${time}`)
+      .feed(1)
+      .feed(1)
+      .text('-----------------------------------------');
+
+    printer
+      .text('-----------------------------------------')
+      .text(`--COMENTARIOS--`)
+      .text('-----------------------------------------')
+      .feed(2)
+      .control('FF')
+      .cut()
+      .close();
+
+    return res.status(200).json({ data: "The ticket was printed successfully." });
+  } catch (error) {
+    console.log(error);
+    return res.status(500).json({ status: 500, message: 'Printer not found!', errorContent: error });
+  }
+}
+
 controller.printTicketKitchen = async (req, res) => {
   try {
     const { ticketBody } = req.body;
@@ -425,7 +491,6 @@ controller.printTestPage = (req, res) => {
     //const device = new escpos.Network('127.0.0.1', 9101);
     //const device = new escpos.Network('172.26.96.1', 9101);
     const device = new escpos.Network('192.168.0.4', 9101);
-    console.log(device);
     const options = { encoding: "857", width: 56 /* default */ }
     const printer = new escpos.Printer(device, options);
 
