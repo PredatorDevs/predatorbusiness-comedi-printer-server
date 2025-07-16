@@ -65,7 +65,7 @@ controller.printManager = async (req, res) => {
       .style('NORMAL')
       .text('-----------------------------------------')
       .text(`Ticket No. ${place.orderId}`)
-      .text(`IMPRESURA:  ${name}`)
+      .text(`IMPRESORA:  ${name}`)
       .text(`LUGAR: ${place.placetypename}`)
       .text(`CLIENTE: ${place.customerComplementaryName}`)
       .text(`FECHA: ${date}          HORA: ${time}`)
