@@ -27,6 +27,10 @@ controller.printManager = async (req, res) => {
   try {
     const { ip, name, port, details, place } = req.body;
 
+    if (!Array.isArray(details)) {
+      return res.status(400).json({ message: 'Invalid details' });
+    }
+
     const device = new escpos.Network(ip, port);
     const options = { encoding: "857", width: 56 }
     const printer = new escpos.Printer(device, options);
@@ -72,6 +76,25 @@ controller.printManager = async (req, res) => {
       .feed(1)
       .feed(1)
       .text('-----------------------------------------');
+
+    for (const info of details) {
+
+      const { quantity, comments, productName } = info;
+      const formattedQuantity = parseInt(quantity).toString().padStart(3);
+      const formattedComment = comments;
+
+      printer
+        .style('B')
+        .text(`${formattedQuantity}  ${productName}`);
+
+      if (formattedComment !== '') {
+        printer
+          .text(`     ${formattedComment}`);
+      }
+
+      printer
+        .style('NORMAL');
+    }
 
     printer
       .text('-----------------------------------------')
