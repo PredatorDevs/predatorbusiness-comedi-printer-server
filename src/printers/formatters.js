@@ -12,14 +12,30 @@ function formatDate() {
         hour12: true
     });
 
-    return `${date}, ${time}`;
+    return `${date}`;
+}
+
+function formatTime() {
+    const now = new Date();
+    const date = now.toLocaleDateString('es-SV', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric'
+    });
+    const time = now.toLocaleTimeString('en-US', {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true
+    });
+
+    return `${time}`;
 }
 
 function formatMoney(value) {
     return `$${parseFloat(value).toFixed(2)}`;
 }
 
-async function kictchenPrinter(printer, { name, details, place }) {
+async function kictchenPrinter(printer, { name, details, place, waiter }) {
     printer
         .font('A')
         .align('CT')
@@ -80,17 +96,20 @@ async function kictchenPrinter(printer, { name, details, place }) {
         .close();
 }
 
-async function printPreCuentaTicket(printer, { details, place }) {
+async function printPreCuentaTicket(printer, { details, place, waiter }) {
+
     printer
         .align('CT')
         .style('B')
         .size(1, 1)
         .text('PRE-CUENTA')
         .size(0, 0)
+        .text(`No. ${place.orderId}`)
         .style('NORMAL')
-        .text(`${place.placeNumber}`)
-        .text(`${place.customerComplementaryName}`)
-        .text(`Fecha/Hora: ${formatDate()}`)
+        .text(`Fecha: ${formatDate()}`)
+        .text(`Hora: ${formatTime()}`)
+        .text(`Mesero: ${waiter}`)
+        .text(`${place.placetypename}: ${place.placeNumber}`)
         .text('-----------------------------------------')
         .align('LT');
 
