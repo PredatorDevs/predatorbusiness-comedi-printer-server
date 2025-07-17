@@ -77,8 +77,9 @@ controller.printManager = async (req, res) => {
       .text(`Cliente   : ${place.customerComplementaryName}`)
       .text(`Fecha     : ${date}`)
       .text(`Hora      : ${time}`)
-      .text('-----------------------------------------')
       .feed(1)
+      .text('-----------------------------------------')
+      .align('CT')
       .style('B')
       .text('DETALLES')
       .style('NORMAL')
@@ -105,14 +106,12 @@ controller.printManager = async (req, res) => {
           { text: `${comments.slice(0, 48)}`, align: "LEFT", width: 0.9 },
         ]);
       }
-
-      printer.feed(1);
     }
 
     printer
       .text('-----------------------------------------')
       .style('B')
-      .text('COMENTARIOS')
+      .text('COCINA')
       .style('NORMAL')
       .text('-----------------------------------------')
       .feed(2)
