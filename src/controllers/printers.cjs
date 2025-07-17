@@ -2,7 +2,8 @@ const escpos = require('escpos');
 const dayjs = require('dayjs');
 const fs = require('fs');
 const ping = require('ping');
-const { exec } = require('child_process')
+const { exec } = require('child_process');
+const { default: formatters } = require('../printers/formatters');
 // install escpos-usb adapter module manually
 
 escpos.USB = require('escpos-usb');
@@ -27,7 +28,7 @@ controller.printManager = async (req, res) => {
   let device;
 
   try {
-    const { ip, name, port, details, place } = req.body;
+    const { ip, name, port, details, place, type } = req.body;
 
     if (!Array.isArray(details)) {
       return res.status(400).json({ message: 'Invalid details' });
@@ -36,18 +37,6 @@ controller.printManager = async (req, res) => {
     device = new escpos.Network(ip, port);
     const options = { encoding: "857", width: 56 }
     const printer = new escpos.Printer(device, options);
-
-    const now = new Date();
-    const date = now.toLocaleDateString('es-SV', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric'
-    });
-    const time = now.toLocaleTimeString('en-US', {
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: true
-    });
 
     function openDevice(device) {
       return new Promise((resolve, reject) => {
@@ -60,64 +49,11 @@ controller.printManager = async (req, res) => {
 
     await openDevice(device);
 
-    printer
-      .font('A')
-      .align('CT')
-      .style('B')
-      .size(1, 1)
-      .text('TICKET DE COCINA')
-      .size(0, 0)
-      .text(`No. ${place.orderId}`)
-      .text('-----------------------------------------')
-      .style('B')
-      .text(`${place.locationname}`)
-      .style('NORMAL')
-      .text('-----------------------------------------')
-      .align('LT')
-      .text(`Impresora: ${name}`)
-      .text(`Cliente: ${place.placeNumber} - ${place.customerComplementaryName}`)
-      .text(`Fecha/Hora: ${date} ${time}`)
-      .feed(1)
-      .text('-----------------------------------------')
-      .align('CT')
-      .style('B')
-      .text('DETALLES')
-      .style('NORMAL')
-      .text('-----------------------------------------');
-
-    printer.tableCustom([
-      { text: "Cant", align: "LEFT", width: 0.10 },
-      { text: "Producto", align: "LEFT", width: 0.90 },
-    ]);
-
-    for (const item of details) {
-      const { quantity, comments, productName } = item;
-
-      printer.tableCustom(
-        [
-          { text: String(parseInt(quantity)), align: "LEFT", width: 0.10 },
-          { text: productName.slice(0, 26), align: "LEFT", width: 0.90 },
-        ]
-      );
-
-      if (comments && comments.trim() !== '') {
-        printer.tableCustom([
-          { text: "", align: "LEFT", width: 0.1 },
-          { text: `${comments.slice(0, 48)}`, align: "LEFT", width: 0.9 },
-        ]);
-      }
+    if (type === 'kitchen') {
+      await formatters.kictchenPrinter(printer, { name, details, place })
+    } else if (type === 'precheck') {
+      await formatters.printPreCuentaTicket(printer, { name, details, place });
     }
-
-    printer
-      .text('-----------------------------------------')
-      .style('B')
-      .text('COCINA')
-      .style('NORMAL')
-      .text('-----------------------------------------')
-      .feed(2)
-      .control('FF')
-      .cut()
-      .close();
 
     return res.status(200).json({ data: "The ticket was printed successfully." });
   } catch (error) {
