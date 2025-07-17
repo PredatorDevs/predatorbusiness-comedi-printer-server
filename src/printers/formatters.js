@@ -120,15 +120,11 @@ async function printPreCuentaTicket(printer, { details, place, waiter }) {
 
     for (const item of details) {
         const quantity = parseInt(item.quantity);
-        const unitPrice = parseFloat(item.subTotal || 0);
-        const lineTotal = quantity * unitPrice;
-
-        total += lineTotal;
 
         printer.tableCustom([
             { text: String(parseInt(quantity)), align: 'LEFT', width: 0.1 },
             { text: item.productName.slice(0, 28), align: 'LEFT', width: 0.5 },
-            { text: formatMoney(lineTotal), align: 'LEFT', width: 0.2 },
+            { text: formatMoney(item.subTotal), align: 'LEFT', width: 0.2 },
         ]);
     }
 
