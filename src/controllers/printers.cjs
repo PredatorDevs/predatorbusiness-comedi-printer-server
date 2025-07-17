@@ -60,45 +60,60 @@ controller.printManager = async (req, res) => {
 
     printer
       .font('A')
-      .align('LT')
-      .style('NORMAL')
+      .align('CT')
+      .style('B')
+      .size(1, 1)
+      .text('TICKET DE COCINA')
       .size(0, 0)
       .text('-----------------------------------------')
       .style('B')
       .text(`${place.locationname}`)
       .style('NORMAL')
       .text('-----------------------------------------')
-      .text(`Ticket No. ${place.orderId}`)
-      .text(`IMPRESORA:  ${name}`)
-      .text(`LUGAR: ${place.placetypename}`)
-      .text(`CLIENTE: ${place.customerComplementaryName}`)
-      .text(`FECHA: ${date}          HORA: ${time}`)
+      .align('LT')
+      .text(`Ticket No.: ${place.orderId}`)
+      .text(`Impresora : ${name}`)
+      .text(`Lugar     : ${place.placetypename}`)
+      .text(`Cliente   : ${place.customerComplementaryName}`)
+      .text(`Fecha     : ${date}`)
+      .text(`Hora      : ${time}`)
+      .text('-----------------------------------------')
       .feed(1)
-      .feed(1)
+      .style('B')
+      .text('DETALLES')
+      .style('NORMAL')
       .text('-----------------------------------------');
 
-    for (const info of details) {
+    printer.tableCustom([
+      { text: "Cant", align: "LEFT", width: 0.10 },
+      { text: "Producto", align: "LEFT", width: 0.90 },
+    ]);
 
-      const { quantity, comments, productName } = info;
-      const formattedQuantity = parseInt(quantity).toString().padStart(3);
-      const formattedComment = comments;
+    for (const item of details) {
+      const { quantity, comments, productName } = item;
 
-      printer
-        .style('B')
-        .text(`${formattedQuantity}  ${productName}`);
+      printer.tableCustom(
+        [
+          { text: String(parseInt(quantity)), align: "LEFT", width: 0.10 },
+          { text: productName.slice(0, 26), align: "LEFT", width: 0.90 },
+        ]
+      );
 
-      if (formattedComment !== '') {
-        printer
-          .text(`     ${formattedComment}`);
+      if (comments && comments.trim() !== '') {
+        printer.tableCustom([
+          { text: "", align: "LEFT", width: 0.1 },
+          { text: `${comments.slice(0, 48)}`, align: "LEFT", width: 0.9 },
+        ]);
       }
 
-      printer
-        .style('NORMAL');
+      printer.feed(1);
     }
 
     printer
       .text('-----------------------------------------')
-      .text(`--COMENTARIOS--`)
+      .style('B')
+      .text('COMENTARIOS')
+      .style('NORMAL')
       .text('-----------------------------------------')
       .feed(2)
       .control('FF')
@@ -274,8 +289,8 @@ controller.printTicketPreAccount = (req, res) => {
 
       for (let i = 0; i < orderDetails.length; i++) {
         const { quantity, name, totalDetail } = orderDetails[i];
-        const formattedQuantity = parseInt(quantity).toString().padStart(3); // Asegura que la cantidad tenga una longitud fija
-        const formattedTotal = parseFloat(totalDetail).toFixed(2); // Asegura que el total tenga una longitud fija
+        const formattedQuantity = parseInt(quantity).toString().padStart(3);
+        const formattedTotal = parseFloat(totalDetail).toFixed(2);
 
         printer
           .style('B')
