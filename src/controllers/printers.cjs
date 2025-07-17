@@ -24,6 +24,8 @@ const matrix_vId = "1203";
 const matrix_pId = "17717";
 
 controller.printManager = async (req, res) => {
+  let device;
+
   try {
     const { ip, name, port, details, place } = req.body;
 
@@ -31,7 +33,7 @@ controller.printManager = async (req, res) => {
       return res.status(400).json({ message: 'Invalid details' });
     }
 
-    const device = new escpos.Network(ip, port);
+    device = new escpos.Network(ip, port);
     const options = { encoding: "857", width: 56 }
     const printer = new escpos.Printer(device, options);
 
@@ -65,18 +67,16 @@ controller.printManager = async (req, res) => {
       .size(1, 1)
       .text('TICKET DE COCINA')
       .size(0, 0)
+      .text(`No. ${place.orderId}`)
       .text('-----------------------------------------')
       .style('B')
       .text(`${place.locationname}`)
       .style('NORMAL')
       .text('-----------------------------------------')
       .align('LT')
-      .text(`Ticket No.: ${place.orderId}`)
-      .text(`Impresora : ${name}`)
-      .text(`Lugar     : ${place.placetypename}`)
-      .text(`Cliente   : ${place.customerComplementaryName}`)
-      .text(`Fecha     : ${date}`)
-      .text(`Hora      : ${time}`)
+      .text(`Impresora: ${name}`)
+      .text(`Cliente: ${place.placeNumber} - ${place.customerComplementaryName}`)
+      .text(`Fecha/Hora: ${date} ${time}`)
       .feed(1)
       .text('-----------------------------------------')
       .align('CT')
@@ -123,6 +123,8 @@ controller.printManager = async (req, res) => {
   } catch (error) {
     console.log(error);
     return res.status(500).json({ status: 500, message: 'Printer not found!', errorContent: error });
+  } finally {
+    if (device) device.close();
   }
 }
 
