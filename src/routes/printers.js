@@ -22,11 +22,14 @@ const {
   printCharLine,
   printSaleDetailsToNetworkPrinter,
   printSettlementXTicket,
-  printSettlementZTicket
+  printSettlementZTicket,
+  printManager
 } = controller;
 
 router.get('/print-guide-lines', printGuideLines);
 router.get('/print-char-line', printCharLine);
+
+router.post('/manager', printManager);
 
 router.get('/test-network', testNetworkPrinterConnection);
 router.get('/test', testPrinterConnection);
