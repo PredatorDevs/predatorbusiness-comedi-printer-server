@@ -1115,7 +1115,7 @@ controller.printDteVoucher = (req, res) => {
         { text: `SUBTOTAL`, align: "RIGHT", width: 0.75 },
         // { text: ``, align: "LEFT", width: 0.25 },
         // { text: ``, align: "RIGHT", width: 0.25 },
-        { text: `${(isNoTaxableOperation ? taxableSubTotalWithoutTaxes : taxableSubTotal - ((+fovialTaxAmount + +cotransTaxAmount))).toFixed(2) || 0}`, align: "RIGHT", width: 0.25 }
+        { text: `${(isNoTaxableOperation ? taxableSubTotalWithoutTaxes : taxableSubTotal - ((+fovialTaxAmount + +cotransTaxAmount + +tourismTaxAmount))).toFixed(2) || 0}`, align: "RIGHT", width: 0.25 }
       ])
       .tableCustom([
         { text: `IVA PERCIBIDO (1%)`, align: "RIGHT", width: 0.75 },
