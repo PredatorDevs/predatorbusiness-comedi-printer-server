@@ -141,7 +141,7 @@ async function printPreCuentaTicket(printer, { details, place, waiter }) {
         .text('-----------------------------------------')
         .align('CT')
         .style('NORMAL')
-        .text('ESTE DOCUMENTO NO TIENE VALOR FISCAL')
+        .text('ESTE DOCUMENTO NO TIENE EFECTO FISCAL')
         .text('ES SOLO UNA PRE-CUENTA DE CONSUMO')
         .feed(2)
         .control('FF')
