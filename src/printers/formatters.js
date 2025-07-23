@@ -41,7 +41,7 @@ async function kictchenPrinter(printer, { name, details, place, waiter }) {
         .align('CT')
         .style('B')
         .size(1, 1)
-        .text('TICKET DE COCINA')
+        .text(`TICKET DE ${name}`)
         .size(0, 0)
         .text(`No. ${place.orderId}`)
         .text('-----------------------------------------')
