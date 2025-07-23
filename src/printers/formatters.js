@@ -137,7 +137,6 @@ async function printPreCuentaTicket(printer, { details, place, waiter }) {
             { text: formatMoney(place.total), align: 'LEFT', width: 0.2 },
         ])
         .style('NORMAL')
-        .feed(1)
         .text('-----------------------------------------')
         .align('CT')
         .style('NORMAL')
