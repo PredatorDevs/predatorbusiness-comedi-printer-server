@@ -84,7 +84,7 @@ async function kictchenPrinter(printer, { name, details, place, waiter }) {
     printer
         .text('-----------------------------------------')
         .style('B')
-        .text('COCINA')
+        .text(`${name}`)
         .style('NORMAL')
         .text('-----------------------------------------')
         .feed(2)
