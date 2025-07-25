@@ -50,7 +50,7 @@ controller.printManager = async (req, res) => {
     await openDevice(device);
 
     if (type === 'kitchen') {
-      await formatters.kictchenPrinter(printer, { name, details, place, waiter })
+      await formatters.kictchenPrinter(printer, { name, details, place, waiter, status })
     } else if (type === 'precheck') {
       await formatters.printPreCuentaTicket(printer, { name, details, place, waiter, status });
     }

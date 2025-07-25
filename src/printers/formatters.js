@@ -35,7 +35,7 @@ function formatMoney(value) {
     return `$${parseFloat(value).toFixed(2)}`;
 }
 
-async function kictchenPrinter(printer, { name, details, place, waiter }) {
+async function kictchenPrinter(printer, { name, details, place, waiter, status }) {
     printer
         .font('A')
         .align('CT')
@@ -50,6 +50,7 @@ async function kictchenPrinter(printer, { name, details, place, waiter }) {
         .text(`Hora: ${formatTime()}`)
         .text(`Mesero: ${waiter}`)
         .text(`${place.placetypename}: ${place.placeNumber}`)
+        .text(`${status}`)
         .feed(1)
         .text('-----------------------------------------')
         .align('CT')
@@ -107,6 +108,7 @@ async function printPreCuentaTicket(printer, { details, place, waiter, status })
         .text(`Hora: ${formatTime()}`)
         .text(`Mesero: ${waiter}`)
         .text(`${place.placetypename}: ${place.placeNumber}`)
+        .text(`${status}`)
         .text('-----------------------------------------')
         .align('LT');
 
