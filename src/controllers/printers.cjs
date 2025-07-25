@@ -28,7 +28,7 @@ controller.printManager = async (req, res) => {
   let device;
 
   try {
-    const { ip, name, port, details, place, type, waiter } = req.body;
+    const { ip, name, port, details, place, type, waiter, status } = req.body;
 
     if (!Array.isArray(details)) {
       return res.status(400).json({ message: 'Invalid details' });
@@ -52,7 +52,7 @@ controller.printManager = async (req, res) => {
     if (type === 'kitchen') {
       await formatters.kictchenPrinter(printer, { name, details, place, waiter })
     } else if (type === 'precheck') {
-      await formatters.printPreCuentaTicket(printer, { name, details, place, waiter });
+      await formatters.printPreCuentaTicket(printer, { name, details, place, waiter, status });
     }
 
     return res.status(200).json({ data: "The ticket was printed successfully." });

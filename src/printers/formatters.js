@@ -93,7 +93,7 @@ async function kictchenPrinter(printer, { name, details, place, waiter }) {
         .close();
 }
 
-async function printPreCuentaTicket(printer, { details, place, waiter }) {
+async function printPreCuentaTicket(printer, { details, place, waiter, status }) {
 
     printer
         .align('CT')
