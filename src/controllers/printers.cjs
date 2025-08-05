@@ -462,10 +462,10 @@ async function checkPrinterOnline(ipAddress) {
 
 controller.printTestPage = (req, res) => {
   try {
-    //const device = new escpos.USB(vId, pId);
-    //const device = new escpos.Network('127.0.0.1', 9101);
-    //const device = new escpos.Network('172.26.96.1', 9101);
-    const device = new escpos.Network('192.168.0.4', 9101);
+    const device = new escpos.USB(vId, pId);
+    // const device = new escpos.Network('127.0.0.1', 9101);
+    // const device = new escpos.Network('172.26.96.1', 9101);
+    // const device = new escpos.Network('192.168.0.4', 9101);
     const options = { encoding: "857", width: 56 /* default */ }
     const printer = new escpos.Printer(device, options);
 
