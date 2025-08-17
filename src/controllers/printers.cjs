@@ -1297,6 +1297,210 @@ controller.printDteVoucher = (req, res) => {
   }
 }
 
+controller.printTransferVoucher = (req, res) => {
+  try {
+    const { useNetworkPrint } = req.query;
+    const {
+      invoiceHeaderData,
+      invoiceBodyData,
+      cashierPrinterIP,
+      cashierPrinterPort
+    } = req.body;
+
+    if (!invoiceHeaderData || !Array.isArray(invoiceBodyData)) {
+      return res
+        .status(400)
+        .json({ status: 400, message: 'You must provide header and body transfer data to print' });
+    }
+
+    // Header
+    const {
+      transferId,
+      transferCompanyId,
+      originLocationId,
+      originLocationName,
+      destinationLocationId,
+      destinationLocationName,
+      sentBy,
+      sentByFullname,
+      sentAt,
+      receivedBy,
+      receivedByFullname,
+      receivedAt,
+      userPINCodeFullName,
+      status,
+      transferStatusName
+    } = invoiceHeaderData;
+
+    // Cálculos simples de totales
+    const sum = (arr, sel) =>
+      (arr || []).reduce((acc, it) => acc + (Number(it?.[sel]) || 0), 0);
+    const totalItems = (invoiceBodyData || []).length;
+    const totalExpected = sum(invoiceBodyData, 'quantityExpected');
+    const totalConfirmed = sum(invoiceBodyData, 'quantityConfirmed');
+
+    // Dispositivo
+    let device;
+
+    if (+useNetworkPrint === 1) {
+      // console.log("Using network printer");
+      // console.log(cashierPrinterIP || '192.168.1.100', cashierPrinterPort || 9100);
+      device = new escpos.Network(cashierPrinterIP || '192.168.1.100', cashierPrinterPort || 9100);
+    } else {
+      device = new escpos.USB(vId, pId);
+    }
+
+    const options = { encoding: '857', width: 48 };
+    const printer = new escpos.Printer(device, options);
+
+    const safe = (v, fallback = '-') => {
+      if (v === null || v === undefined) return fallback;
+      const s = String(v).trim();
+      return s.length ? s : fallback;
+    };
+
+    const asDateTime = (v) =>
+      v ? dayjs(v).format('YYYY-MM-DD HH:mm:ss') : '-';
+
+    device.open(function (error) {
+      if (error) {
+        return res.status(500).json({ status: 500, message: 'Printer open error', errorContent: error });
+      }
+
+      try {
+        // ENCABEZADO
+        printer
+          .font('A')
+          .align('CT')
+          .style('B')
+          .size(0, 0)
+          .text('TRASLADO DE INVENTARIO')
+          .style('NORMAL')
+          .feed(1)
+          .align('LT')
+          .tableCustom([
+            { text: `Transferencia: ${safe(transferId)}`, align: 'LEFT', width: 0.60 },
+            { text: `Estado: ${safe(transferStatusName)}`, align: 'RIGHT', width: 0.40 }
+          ])
+          // .tableCustom([
+          //   { text: `Empresa: ${safe(transferCompanyId)}`, align: 'LEFT', width: 1.0 }
+          // ])
+          .tableCustom([
+            { text: `Origen: ${safe(originLocationName)}`, align: 'LEFT', width: 1.0 }
+          ])
+          .tableCustom([
+            { text: `Destino: ${safe(destinationLocationName)}`, align: 'LEFT', width: 1.0 }
+          ])
+          .feed(1)
+          .tableCustom([
+            { text: `Enviado por: ${safe(sentByFullname || sentBy)}`, align: 'LEFT', width: 0.70 },
+            { text: `${asDateTime(sentAt)}`, align: 'RIGHT', width: 0.30 }
+          ])
+          .tableCustom([
+            { text: `Recibido por: ${safe(receivedByFullname || receivedBy)}`, align: 'LEFT', width: 0.70 },
+            { text: `${asDateTime(receivedAt)}`, align: 'RIGHT', width: 0.30 }
+          ])
+          .feed(1)
+          .align('CT')
+          .text('-----------------------------------------------')
+          .align('LT')
+          .tableCustom([
+            { text: 'DESCRIPCION', align: 'LEFT', width: 0.58 },
+            { text: 'EXP', align: 'RIGHT', width: 0.14 },
+            { text: 'CONF', align: 'RIGHT', width: 0.14 },
+            { text: 'EST', align: 'RIGHT', width: 0.14 }
+          ])
+          .align('CT')
+          .text('-----------------------------------------------')
+          .align('LT');
+
+        // DETALLE
+        for (let i = 0; i < invoiceBodyData.length; i++) {
+          const {
+            transferDetailId,
+            productId,
+            quantityExpected,
+            quantityConfirmed,
+            transferDetailStatus,
+            transferDetailStatusName,
+            productName
+          } = invoiceBodyData[i];
+
+          // Línea principal del item
+          printer.tableCustom([
+            { text: safe(productName, '(Sin nombre)'), align: 'LEFT', width: 0.58 },
+            { text: `${Number(quantityExpected || 0).toFixed(2)}`, align: 'RIGHT', width: 0.14 },
+            { text: `${Number(quantityConfirmed || 0).toFixed(2)}`, align: 'RIGHT', width: 0.14 },
+            { text: safe(transferDetailStatusName, '-'), align: 'RIGHT', width: 0.14 }
+          ]);
+
+          // Línea secundaria opcional con IDs (útil para control interno)
+          printer.tableCustom([
+            { text: `DetID:${safe(transferDetailId)} ProdID:${safe(productId)}`, align: 'LEFT', width: 1.0 }
+          ]);
+
+          if ((i + 1) < invoiceBodyData.length) printer.feed(1);
+        }
+
+        // RESUMEN / TOTALES
+        printer
+          .align('CT')
+          .text('-----------------------------------------------')
+          .align('LT')
+          .tableCustom([
+            { text: 'Total ítems', align: 'LEFT', width: 0.70 },
+            { text: `${totalItems}`, align: 'RIGHT', width: 0.30 }
+          ])
+          .tableCustom([
+            { text: 'Total esperado', align: 'LEFT', width: 0.70 },
+            { text: `${Number(totalExpected).toFixed(2)}`, align: 'RIGHT', width: 0.30 }
+          ])
+          .tableCustom([
+            { text: 'Total confirmado', align: 'LEFT', width: 0.70 },
+            { text: `${Number(totalConfirmed).toFixed(2)}`, align: 'RIGHT', width: 0.30 }
+          ])
+          .feed(1)
+          .tableCustom([
+            { text: `Imp. por: ${safe(userPINCodeFullName)}`, align: 'LEFT', width: 1.0 }
+          ])
+          .feed(1)
+          .align('CT')
+          .text('--- CONTROL INTERNO ---');
+
+        // QR con datos mínimos de la transferencia
+        const qrPayload = JSON.stringify({
+          type: 'transfer',
+          id: transferId || '',
+          status: transferStatusName || '',
+          sentAt: sentAt ? dayjs(sentAt).format('YYYY-MM-DD HH:mm:ss') : ''
+        });
+
+        printer.qrimage(qrPayload, { type: 'png', mode: 'dhdw', size: 3 }, function (err) {
+          // Cierre y respuesta
+          this.feed(2);
+          this.cut();
+          this.close((closeErr) => {
+            if (closeErr) {
+              return res.status(500).json({ status: 500, message: 'Print error', errorContent: closeErr });
+            }
+            return res.json({ status: 200, message: 'Print success' });
+          });
+        });
+      } catch (printErr) {
+        try {
+          printer.close(() => {
+            return res.status(500).json({ status: 500, message: 'Print error', errorContent: printErr });
+          });
+        } catch (_) {
+          return res.status(500).json({ status: 500, message: 'Print error', errorContent: printErr });
+        }
+      }
+    });
+  } catch (err) {
+    return res.status(500).json({ status: 500, message: 'Printer not found!', errorContent: err });
+  }
+};
+
 controller.printOrderSaleVoucher = (req, res) => {
   try {
     const { useNetworkPrint } = req.query;
