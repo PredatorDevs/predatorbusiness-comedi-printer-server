@@ -91,6 +91,7 @@ async function kictchenPrinter(printer, { name, details, place, waiter, status }
         .feed(2)
         .control('FF')
         .cut()
+        .beep(2, 5)
         .close();
 }
 
@@ -147,6 +148,7 @@ async function printPreCuentaTicket(printer, { details, place, waiter, status })
         .feed(2)
         .control('FF')
         .cut()
+        .beep(2, 5)
         .close();
 }
 
