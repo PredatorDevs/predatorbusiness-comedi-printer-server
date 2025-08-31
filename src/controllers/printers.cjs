@@ -28,8 +28,8 @@ controller.printManager = async (req, res) => {
   let device;
 
   try {
-    const { ip, name, port, details, place, type, waiter, status } = req.body;
-
+    const { ip, name, port, details, place, type, waiter, status, customerName, tipAmount } = req.body;
+    
     if (!Array.isArray(details)) {
       return res.status(400).json({ message: 'Invalid details' });
     }
@@ -50,9 +50,9 @@ controller.printManager = async (req, res) => {
     await openDevice(device);
 
     if (type === 'kitchen') {
-      await formatters.kictchenPrinter(printer, { name, details, place, waiter, status })
+      await formatters.kictchenPrinter(printer, { name, details, place, waiter, status, customerName })
     } else if (type === 'precheck') {
-      await formatters.printPreCuentaTicket(printer, { name, details, place, waiter, status });
+      await formatters.printPreCuentaTicket(printer, { name, details, place, waiter, status, customerName, tipAmount });
     }
 
     return res.status(200).json({ data: "The ticket was printed successfully." });
@@ -911,6 +911,7 @@ controller.printDteVoucher = (req, res) => {
       // console.log("Using network printer");
       // console.log(cashierPrinterIp || '192.168.1.100', cashierPrinterPort || 9100);
       device = new escpos.Network(cashierPrinterIp || '192.168.1.100', cashierPrinterPort || 9100);
+      console.log(req.body.cashierPrinterIp, req.body.cashierPrinterPort);
     } else {
       device = new escpos.USB(vId, pId);
     }
@@ -1012,6 +1013,7 @@ controller.printDteVoucher = (req, res) => {
       transmissionModelName,
       transmissionType,
       transmissionTypeName,
+      tip,
       userPINCodeFullName,
       voidedByFullname,
       notes
@@ -1201,13 +1203,21 @@ controller.printDteVoucher = (req, res) => {
         // { text: ``, align: "RIGHT", width: 0.25 },
         { text: `${Number(0).toFixed(2) || 0}`, align: "RIGHT", width: 0.25 }
       ])
-        .tableCustom([
-          { text: `MONTO TOTAL OPERACION`, align: "RIGHT", width: 0.75 },
+      .tableCustom([
+        { text: `MONTO TOTAL OPERACION`, align: "RIGHT", width: 0.75 },
+        // { text: ``, align: "LEFT", width: 0.25 },
+        // { text: ``, align: "RIGHT", width: 0.25 },
+        { text: `${Number(+total - (isNoTaxableOperation ? +ivaTaxAmount : 0) - +IVAretention + +IVAperception).toFixed(2) || 0}`, align: "RIGHT", width: 0.25 }
+      ]);      
+      if (+tip !== null && +tip > 0) {
+        printer.tableCustom([
+          { text: `PROPINA`, align: "RIGHT", width: 0.75 },
           // { text: ``, align: "LEFT", width: 0.25 },
           // { text: ``, align: "RIGHT", width: 0.25 },
-          { text: `${Number(+total - (isNoTaxableOperation ? +ivaTaxAmount : 0) - +IVAretention + +IVAperception).toFixed(2) || 0}`, align: "RIGHT", width: 0.25 }
-        ])
-        .tableCustom([
+          { text: `${Number(tip).toFixed(2) || 0}`, align: "RIGHT", width: 0.25 }
+        ]);
+      }
+      printer.tableCustom([
           { text: `OTROS MONTOS NO AFECTOS`, align: "RIGHT", width: 0.75 },
           // { text: ``, align: "LEFT", width: 0.25 },
           // { text: ``, align: "RIGHT", width: 0.25 },
@@ -1217,7 +1227,7 @@ controller.printDteVoucher = (req, res) => {
           { text: `TOTAL A PAGAR`, align: "RIGHT", width: 0.75 },
           // { text: ``, align: "LEFT", width: 0.25 },
           // { text: ``, align: "RIGHT", width: 0.25 },
-          { text: `${Number(+total - (isNoTaxableOperation ? +ivaTaxAmount : 0) - +IVAretention + +IVAperception).toFixed(2) || 0}`, align: "RIGHT", width: 0.25 }
+          { text: `${Number(+total + +(tip || 0) - (isNoTaxableOperation ? +ivaTaxAmount : 0) - +IVAretention + +IVAperception).toFixed(2) || 0}`, align: "RIGHT", width: 0.25 }
         ])
         // .tableCustom([
         //   { text: `TOTAL`, align: "LEFT", width: 0.30 },
@@ -1273,6 +1283,7 @@ controller.printDteVoucher = (req, res) => {
             this.text('*** ESTE COMPROBANTE NO TIENE EFECTO FISCAL ***');
             this.feed(2);
             this.cut();
+            // this.beep(2, 100);
             this.close((err) => {
               if (err) {
                 res.json({ data: "Print error" });

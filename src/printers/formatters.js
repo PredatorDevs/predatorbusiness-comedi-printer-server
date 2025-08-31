@@ -35,7 +35,7 @@ function formatMoney(value) {
     return `$${parseFloat(value).toFixed(2)}`;
 }
 
-async function kictchenPrinter(printer, { name, details, place, waiter, status }) {
+async function kictchenPrinter(printer, { name, details, place, waiter, status, customerName }) {
     printer
         .font('A')
         .align('CT')
@@ -49,6 +49,7 @@ async function kictchenPrinter(printer, { name, details, place, waiter, status }
         .text(`Fecha: ${formatDate()}`)
         .text(`Hora: ${formatTime()}`)
         .text(`Mesero: ${waiter}`)
+        .text(`Cliente: ${customerName || ''}`)
         .text(`${place.placetypename}: ${place.placeNumber}`)
         .text(`${status}`)
         .feed(1)
@@ -95,7 +96,7 @@ async function kictchenPrinter(printer, { name, details, place, waiter, status }
         .close();
 }
 
-async function printPreCuentaTicket(printer, { details, place, waiter, status }) {
+async function printPreCuentaTicket(printer, { details, place, waiter, status, customerName, tipAmount }) {
 
     printer
         .align('CT')
@@ -107,7 +108,7 @@ async function printPreCuentaTicket(printer, { details, place, waiter, status })
         .style('NORMAL')
         .text(`Fecha: ${formatDate()}`)
         .text(`Hora: ${formatTime()}`)
-        .text(`Mesero: ${waiter}`)
+        .text(`Cliente: ${customerName || ''}`)
         .text(`${place.placetypename}: ${place.placeNumber}`)
         .text(`${status}`)
         .text('-----------------------------------------')
@@ -136,8 +137,18 @@ async function printPreCuentaTicket(printer, { details, place, waiter, status })
         .style('B')
         .tableCustom([
             { text: '', align: 'LEFT', width: 0.4 },
-            { text: 'TOTAL:', align: 'LEFT', width: 0.2 },
+            { text: 'SUBTOTAL:', align: 'LEFT', width: 0.2 },
             { text: formatMoney(place.total), align: 'LEFT', width: 0.2 },
+        ])
+        .tableCustom([
+            { text: '', align: 'LEFT', width: 0.4 },
+            { text: 'PROPINA:', align: 'LEFT', width: 0.2 },
+            { text: formatMoney(+tipAmount || 0), align: 'LEFT', width: 0.2 },
+        ])
+        .tableCustom([
+            { text: '', align: 'LEFT', width: 0.4 },
+            { text: 'TOTAL:', align: 'LEFT', width: 0.2 },
+            { text: formatMoney(+place.total + (+tipAmount || 0)), align: 'LEFT', width: 0.2 },
         ])
         .style('NORMAL')
         .text('-----------------------------------------')
