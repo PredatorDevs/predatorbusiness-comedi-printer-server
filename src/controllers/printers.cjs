@@ -390,7 +390,7 @@ controller.testNetworkPrinterConnection = (req, res) => {
 
 controller.testPrinterConnection = (req, res) => {
   try {
-    // console.log(escpos.USB.findPrinter());
+    console.log(escpos.USB.findPrinter());
 
     //const device  = new escpos.USB(vId, pId);
     const device = new escpos.Network('192.168.0.4', 9101);
