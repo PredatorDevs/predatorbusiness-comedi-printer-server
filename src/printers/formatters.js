@@ -96,7 +96,7 @@ async function kictchenPrinter(printer, { name, details, place, waiter, status, 
         .close();
 }
 
-async function printPreCuentaTicket(printer, { details, place, waiter, status, customerName, tipAmount }) {
+async function printPreCuentaTicket(printer, { details, place, waiter, status, customerName, tipAmount, customerAddress = '', customerPhone = '' }) {
 
     printer
         .align('CT')
@@ -108,8 +108,10 @@ async function printPreCuentaTicket(printer, { details, place, waiter, status, c
         .style('NORMAL')
         .text(`Fecha: ${formatDate()}`)
         .text(`Hora: ${formatTime()}`)
-        .text(`Cliente: ${customerName || ''}`)
+        .text(customerName || place.customerName ? `Cliente: ${customerName || place.customerName || ''}` : '')
         .text(`${place.placetypename}: ${place.placeNumber}`)
+        .text(customerAddress || place.customerAddress ? `Direccion: ${customerAddress || place.customerAddress || ''}` : '')
+        .text(customerPhone || place.customerPhone ? `Teléfono: ${customerPhone || place.customerPhone || ''}` : '')
         .text(`${status}`)
         .text('-----------------------------------------')
         .align('LT');
