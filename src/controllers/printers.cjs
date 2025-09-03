@@ -1,3 +1,5 @@
+// ESTE SALUDO ES PARA DON GUSTAVO
+
 const escpos = require('escpos');
 const dayjs = require('dayjs');
 const fs = require('fs');
