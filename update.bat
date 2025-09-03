@@ -1,30 +1,39 @@
 @echo off
 setlocal
 
-set GIT_BIN=%~dp0tools\PortableGit\bin\git.exe
-set APPDIR=%~dp0
+rem === RUTAS (ajusta si renombraste la carpeta) ===
+set "GIT_BIN=%~dp0tools\PortableGit\bin\git.exe"
+set "APPDIR=%~dp0"
 
 if not exist "%GIT_BIN%" (
-  echo ❌ No se encontró git.exe en %GIT_BIN%
+  echo [ERROR] No se encontro git.exe en: %GIT_BIN%
   pause
   exit /b 1
 )
 
-rem 1) Inicializar una vez
-if not exist "%APPDIR%\.git" (
-  echo 🔄 Inicializando repo...
-  "%GIT_BIN%" init "%APPDIR%"
-  "%GIT_BIN%" -C "%APPDIR%" remote add origin https://github.com/PredatorDevs/predatorbusiness-comedi-printer-server.git
-  "%GIT_BIN%" -C "%APPDIR%" fetch --depth=1 origin master
-  "%GIT_BIN%" -C "%APPDIR%" checkout -f FETCH_HEAD
+rem Cambiar a la carpeta del proyecto (evitamos -C y problemas de comillas)
+pushd "%APPDIR%" || (
+  echo [ERROR] No se pudo cambiar a %APPDIR%
+  pause
+  exit /b 1
+)
+
+rem === PRIMERA VEZ: inicializa repo local y hace checkout del ultimo commit ===
+if not exist ".git" (
+  echo Inicializando repositorio local...
+  "%GIT_BIN%" init .
+  "%GIT_BIN%" remote add origin https://github.com/PredatorDevs/predatorbusiness-comedi-printer-server.git
+  "%GIT_BIN%" fetch --depth=1 origin master
+  "%GIT_BIN%" checkout -f FETCH_HEAD
   goto done
 )
 
-rem 2) Actualizar
-echo ⏬ Descargando cambios...
-"%GIT_BIN%" -C "%APPDIR%" fetch --depth=1 origin master
-"%GIT_BIN%" -C "%APPDIR%" reset --hard FETCH_HEAD
+rem === SIGUIENTES EJECUCIONES: actualiza a ultimo commit ===
+echo Descargando cambios...
+"%GIT_BIN%" fetch --depth=1 origin master
+"%GIT_BIN%" reset --hard FETCH_HEAD
 
 :done
-echo ✅ Proyecto actualizado.
+echo Proyecto actualizado.
+popd
 pause
