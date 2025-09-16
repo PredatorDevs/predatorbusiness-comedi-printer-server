@@ -101,12 +101,12 @@ async function printPreCuentaTicket(printer, { details, place, waiter, status, c
     printer
         .align('CT')
         .style('B')
-        .size(1, 1)
-        .text('PRE-CUENTA')
         .size(1, 0)
         .text('PRE-CUENTA')
-        .size(0, 1)
-        .text('PRE-CUENTA')
+        // .size(1, 0)
+        // .text('PRE-CUENTA')
+        // .size(0, 1)
+        // .text('PRE-CUENTA')
         .size(0, 0)
         .text(`No. ${place.orderId}`)
         .style('NORMAL')
@@ -116,7 +116,10 @@ async function printPreCuentaTicket(printer, { details, place, waiter, status, c
         // .text(`${place.placetypename}: ${place.placeNumber}`)
         .text(customerAddress || place.customerAddress ? `Direccion: ${customerAddress || place.customerAddress || ''}` : '')
         .text(customerPhone || place.customerPhone ? `Teléfono: ${customerPhone || place.customerPhone || ''}` : '')
+        .feed(1)
+        .size(1, 0)
         .text(`${status}`)
+        .size(0, 0)
         .text('-----------------------------------------')
         .align('LT');
 
@@ -137,6 +140,8 @@ async function printPreCuentaTicket(printer, { details, place, waiter, status, c
             { text: formatMoney(item.subTotal), align: 'LEFT', width: 0.2 },
         ]);
     }
+
+    console.log(place);
 
     printer
         .text('-----------------------------------------')

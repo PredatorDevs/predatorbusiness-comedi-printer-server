@@ -30,8 +30,6 @@ controller.printManager = async (req, res) => {
   try {
     const { ip, name, port, details, place, type, waiter, status, customerName, tipAmount, customerAddress, customerPhone } = req.body;
 
-    console.log(req.body);
-
     if (!Array.isArray(details)) {
       return res.status(400).json({ message: 'Invalid details' });
     }
