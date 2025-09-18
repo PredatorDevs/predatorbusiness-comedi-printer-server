@@ -1028,10 +1028,13 @@ controller.printDteVoucher = (req, res) => {
         .font('A')
         .align('CT')
         .style('NORMAL')
-        .size(0, 0)
-        .text(ownerTradename || '')
-        .text(ownerName || '')
-        .text(`${ownerActivityDescription || ''}`)
+        .size(0, 0);
+      
+      if (ownerTradename) printer.text(ownerTradename.toUpperCase() || '');
+      if (ownerName) printer.text(ownerName.toUpperCase() || '');
+      if (ownerActivityDescription) printer.text(`Giro: ${ownerActivityDescription}`.toUpperCase() || '');
+
+      printer
         .text(`NIT: ${ownerNit || ''} - NRC: ${ownerNrc || ''}`)
         .text(locationAddress || '')
         .text(locationPhone || '')
