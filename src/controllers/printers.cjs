@@ -993,6 +993,8 @@ controller.printDteVoucher = (req, res) => {
       ownerNit,
       ownerNrc,
       ownerTradename,
+      order_type,
+      orderCustomerComplementaryName,
       paymentStatus,
       paymentStatusName,
       paymentTypeId,
@@ -1051,8 +1053,13 @@ controller.printDteVoucher = (req, res) => {
           { text: `SUC: ${String(locationName).toUpperCase()}`, align: "RIGHT", width: 0.50 }
         ])
         .text(`FECHA: ${dayjs(docDatetime).format('YYYY-MM-DD hh:mm:ss')}`)
-        .text(`CLIENTE: ${customerFullname}`)
-        .text(`DUI: ${customerDui || '-'}`)
+        .text(`CLIENTE: ${customerFullname}`);
+
+      if (order_type === 'domicilio') {
+        if (orderCustomerComplementaryName) printer.text(`DOMICILIO PARA: ${orderCustomerComplementaryName}`);
+      }
+
+      printer.text(`DUI: ${customerDui || '-'}`)
         .text(`NIT: ${customerNit || '-'}`)
         .text(`NRC: ${customerNrc || '-'}`)
         // .qrimage('https://github.com/song940/node-escpos', function(err){
@@ -1289,6 +1296,7 @@ controller.printDteVoucher = (req, res) => {
             this.text('*** ESTE COMPROBANTE NO TIENE EFECTO FISCAL ***');
             this.feed(2);
             this.cut();
+            this.cashdraw(2);
             // this.beep(2, 100);
             this.close((err) => {
               if (err) {
