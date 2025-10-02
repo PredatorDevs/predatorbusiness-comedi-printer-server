@@ -412,7 +412,11 @@ controller.testPrinterConnection = (req, res) => {
 
 controller.testCashdrawerOpenAction = (req, res) => {
   try {
-    const device = new escpos.USB(vId, pId);
+    // const device = new escpos.USB(vId, pId);
+    const device = new escpos.Network('192.168.0.130', 9100);
+
+    console.log("HOLA VOY A ABRIR LA CAJA");
+    
     const options = { encoding: "857", width: 48 /* default */ }
     const printer = new escpos.Printer(device, options);
 

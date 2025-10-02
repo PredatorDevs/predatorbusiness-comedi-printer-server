@@ -22,6 +22,7 @@ const {
   printGuideLines,
   printCharLine,
   printSaleDetailsToNetworkPrinter,
+  testCashdrawerOpenAction,
   printSettlementXTicket,
   printSettlementZTicket,
   printManager
@@ -29,6 +30,8 @@ const {
 
 router.get('/print-guide-lines', printGuideLines);
 router.get('/print-char-line', printCharLine);
+
+router.get('/test-cashdrawer-open', testCashdrawerOpenAction);
 
 router.post('/manager', printManager);
 
