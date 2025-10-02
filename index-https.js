@@ -47,8 +47,8 @@ app.get('*', (req, res) => {
 
 // 📜 Lee los certificados
 const httpsOptions = {
-  key: fs.readFileSync(join(__dirname, 'certs', 'micertificado+3-key.pem')),
-  cert: fs.readFileSync(join(__dirname, 'certs', 'micertificado+3.pem')),
+  key: fs.readFileSync(join(__dirname, 'certs', 'micertificado+6-key.pem')),
+  cert: fs.readFileSync(join(__dirname, 'certs', 'micertificado+6.pem')),
 };
 
 // 🚀 Arranca servidor HTTPS
