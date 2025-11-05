@@ -1063,13 +1063,13 @@ controller.printDteVoucher = (req, res) => {
         if (orderCustomerComplementaryName) printer.text(`DOMICILIO PARA: ${orderCustomerComplementaryName}`);
       }
 
-      printer.text(`DUI: ${customerDui || '-'}`)
+      if (customerId !== 1) {
+        printer.text(`DUI: ${customerDui || '-'}`)
         .text(`NIT: ${customerNit || '-'}`)
-        .text(`NRC: ${customerNrc || '-'}`)
-        // .qrimage('https://github.com/song940/node-escpos', function(err){
+        .text(`NRC: ${customerNrc || '-'}`);
+      }
 
-        // })
-        .feed(1) // LINE 9
+      printer.feed(1) // LINE 9
         .align('CT')
         // .text('------------------------------------------------')
         // .tableCustom([
@@ -1146,24 +1146,28 @@ controller.printDteVoucher = (req, res) => {
         // .feed(1)
         .text('------------------------------------------------')
         // .text('------------------------------------------')
-        .tableCustom([
+      // Solo mostrar GRAVADO si el valor es mayor a 0
+      const gravadoAmount = isNoTaxableOperation ? 0 : taxableSubTotal - ((+fovialTaxAmount + +cotransTaxAmount + +tourismTaxAmount + ((documentTypeId === 1 || documentTypeId === 2) ? 0 : +ivaTaxAmount)) || 0);
+      if (gravadoAmount > 0) {
+        printer.tableCustom([
           { text: `GRAVADO`, align: "RIGHT", width: 0.75 },
-          // { text: ``, align: "LEFT", width: 0.25 },
-          // { text: ``, align: "RIGHT", width: 0.25 },
-          { text: `${(isNoTaxableOperation ? 0 : taxableSubTotal - ((+fovialTaxAmount + +cotransTaxAmount + +tourismTaxAmount + ((documentTypeId === 1 || documentTypeId === 2) ? 0 : +ivaTaxAmount)) || 0)).toFixed(2) || 0}`, align: "RIGHT", width: 0.25 }
-        ])
-        .tableCustom([
-          { text: `EXENTO`, align: "RIGHT", width: 0.75 },
-          // { text: ``, align: "LEFT", width: 0.25 },
-          // { text: ``, align: "RIGHT", width: 0.25 },
-          { text: `${(isNoTaxableOperation ? taxableSubTotalWithoutTaxes : 0).toFixed(2) || 0}`, align: "RIGHT", width: 0.25 }
-        ])
-        .tableCustom([
-          { text: `SUMA TOTAL DE OPERACIONES`, align: "RIGHT", width: 0.75 },
-          // { text: ``, align: "LEFT", width: 0.25 },
-          // { text: ``, align: "RIGHT", width: 0.25 },
-          { text: `${(isNoTaxableOperation ? taxableSubTotalWithoutTaxes : taxableSubTotal - ((+fovialTaxAmount + +cotransTaxAmount + +tourismTaxAmount + ((documentTypeId === 1 || documentTypeId === 2) ? 0 : +ivaTaxAmount)))).toFixed(2) || 0}`, align: "RIGHT", width: 0.25 }
+          { text: `${gravadoAmount.toFixed(2)}`, align: "RIGHT", width: 0.25 }
         ]);
+      }
+      
+      // Solo mostrar EXENTO si el valor es mayor a 0
+      const exentoAmount = isNoTaxableOperation ? taxableSubTotalWithoutTaxes : 0;
+      if (exentoAmount > 0) {
+        printer.tableCustom([
+          { text: `EXENTO`, align: "RIGHT", width: 0.75 },
+          { text: `${exentoAmount.toFixed(2)}`, align: "RIGHT", width: 0.25 }
+        ]);
+      }
+      
+      printer.tableCustom([
+        { text: `SUMA TOTAL DE OPERACIONES`, align: "RIGHT", width: 0.75 },
+        { text: `${(isNoTaxableOperation ? taxableSubTotalWithoutTaxes : taxableSubTotal - ((+fovialTaxAmount + +cotransTaxAmount + +tourismTaxAmount + ((documentTypeId === 1 || documentTypeId === 2) ? 0 : +ivaTaxAmount)))).toFixed(2) || 0}`, align: "RIGHT", width: 0.25 }
+      ]);
       if (!(documentTypeId === 1 || documentTypeId === 2)) {
         printer.tableCustom([
           { text: `IVA`, align: "RIGHT", width: 0.75 },
@@ -1174,22 +1178,24 @@ controller.printDteVoucher = (req, res) => {
       }
       printer.tableCustom([
         { text: `SUBTOTAL`, align: "RIGHT", width: 0.75 },
-        // { text: ``, align: "LEFT", width: 0.25 },
-        // { text: ``, align: "RIGHT", width: 0.25 },
         { text: `${(isNoTaxableOperation ? taxableSubTotalWithoutTaxes : taxableSubTotal - ((+fovialTaxAmount + +cotransTaxAmount + +tourismTaxAmount))).toFixed(2) || 0}`, align: "RIGHT", width: 0.25 }
-      ])
-        .tableCustom([
+      ]);
+      
+      // Solo mostrar IVA PERCIBIDO si el valor es mayor a 0
+      if (+IVAperception > 0) {
+        printer.tableCustom([
           { text: `IVA PERCIBIDO (1%)`, align: "RIGHT", width: 0.75 },
-          // { text: ``, align: "LEFT", width: 0.25 },
-          // { text: ``, align: "RIGHT", width: 0.25 },
-          { text: `${Number(IVAperception).toFixed(2) || 0}`, align: "RIGHT", width: 0.25 }
-        ])
-        .tableCustom([
-          { text: `IVA RETENIDO (1%)`, align: "RIGHT", width: 0.75 },
-          // { text: ``, align: "LEFT", width: 0.25 },
-          // { text: ``, align: "RIGHT", width: 0.25 },
-          { text: `${Number(IVAretention).toFixed(2) || 0}`, align: "RIGHT", width: 0.25 }
+          { text: `${Number(IVAperception).toFixed(2)}`, align: "RIGHT", width: 0.25 }
         ]);
+      }
+      
+      // Solo mostrar IVA RETENIDO si el valor es mayor a 0
+      if (+IVAretention > 0) {
+        printer.tableCustom([
+          { text: `IVA RETENIDO (1%)`, align: "RIGHT", width: 0.75 },
+          { text: `${Number(IVAretention).toFixed(2)}`, align: "RIGHT", width: 0.25 }
+        ]);
+      }
       if (+fovialTaxAmount !== null && +fovialTaxAmount > 0) {
         printer.tableCustom([
           { text: `FOVIAL ($0.20/gal)`, align: "RIGHT", width: 0.75 },
@@ -1214,16 +1220,18 @@ controller.printDteVoucher = (req, res) => {
           { text: `${Number(tourismTaxAmount).toFixed(2) || 0}`, align: "RIGHT", width: 0.25 }
         ]);
       }
+      
+      // Solo mostrar RETE. RENTA si el valor es mayor a 0
+      const reteRentaAmount = Number(0); // Este valor parece estar hardcodeado en 0
+      if (reteRentaAmount > 0) {
+        printer.tableCustom([
+          { text: `RETE. RENTA`, align: "RIGHT", width: 0.75 },
+          { text: `${reteRentaAmount.toFixed(2)}`, align: "RIGHT", width: 0.25 }
+        ]);
+      }
+      
       printer.tableCustom([
-        { text: `RETE. RENTA`, align: "RIGHT", width: 0.75 },
-        // { text: ``, align: "LEFT", width: 0.25 },
-        // { text: ``, align: "RIGHT", width: 0.25 },
-        { text: `${Number(0).toFixed(2) || 0}`, align: "RIGHT", width: 0.25 }
-      ])
-      .tableCustom([
         { text: `MONTO TOTAL OPERACION`, align: "RIGHT", width: 0.75 },
-        // { text: ``, align: "LEFT", width: 0.25 },
-        // { text: ``, align: "RIGHT", width: 0.25 },
         { text: `${Number(+total - (isNoTaxableOperation ? +ivaTaxAmount : 0) - +IVAretention + +IVAperception).toFixed(2) || 0}`, align: "RIGHT", width: 0.25 }
       ]);      
       if (+tip !== null && +tip > 0) {
@@ -1234,16 +1242,18 @@ controller.printDteVoucher = (req, res) => {
           { text: `${Number(tip).toFixed(2) || 0}`, align: "RIGHT", width: 0.25 }
         ]);
       }
-      printer.tableCustom([
+      
+      // Solo mostrar OTROS MONTOS NO AFECTOS si el valor es mayor a 0
+      const otrosMontosAmount = Number(0); // Este valor parece estar hardcodeado en 0
+      if (otrosMontosAmount > 0) {
+        printer.tableCustom([
           { text: `OTROS MONTOS NO AFECTOS`, align: "RIGHT", width: 0.75 },
-          // { text: ``, align: "LEFT", width: 0.25 },
-          // { text: ``, align: "RIGHT", width: 0.25 },
-          { text: `${Number(0).toFixed(2) || 0}`, align: "RIGHT", width: 0.25 }
-        ])
-        .tableCustom([
+          { text: `${otrosMontosAmount.toFixed(2)}`, align: "RIGHT", width: 0.25 }
+        ]);
+      }
+      
+      printer.tableCustom([
           { text: `TOTAL A PAGAR`, align: "RIGHT", width: 0.75 },
-          // { text: ``, align: "LEFT", width: 0.25 },
-          // { text: ``, align: "RIGHT", width: 0.25 },
           { text: `${Number(+total + +(tip || 0) - (isNoTaxableOperation ? +ivaTaxAmount : 0) - +IVAretention + +IVAperception).toFixed(2) || 0}`, align: "RIGHT", width: 0.25 }
         ])
         // .tableCustom([
