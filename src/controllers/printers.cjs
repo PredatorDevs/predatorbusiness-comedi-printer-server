@@ -1447,36 +1447,11 @@ controller.printExpenseVoucher = (req, res) => {
 controller.printShiftcutReportSalesAccumByPresentation = (req, res) => {
   try {
     const { useNetworkPrint } = req.query;
-    const { expenseData, cashierPrinterIp, cashierPrinterPort } = req.body;
+    const { headerData, bodyData, cashierPrinterIp, cashierPrinterPort } = req.body;
 
-    if (!expenseData) throw "You must provide expense data to print";
+    if (!headerData || !bodyData) throw "You must provide data to print";
 
-    const {
-      expenseId,
-      expenseTypeName,
-      paymentMethodName,
-      accountingName,
-      accountingNum,
-      documentNumber,
-      documentDatetime,
-      concept,
-      description,
-      taxedAmount,
-      noTaxedAmount,
-      bonus,
-      discounts,
-      iva,
-      fovial,
-      cotrans,
-      reteRenta,
-      ivaRetention,
-      ivaPerception,
-      amount,
-      createdByFullname,
-      isVoided
-    } = expenseData;
-
-    console.log(expenseData);
+    const { locationName, cashierName, shiftcutNumber } = headerData;
 
     // --- CONFIGURACIÓN DE DISPOSITIVO ---
     let device;
@@ -1488,67 +1463,103 @@ controller.printShiftcutReportSalesAccumByPresentation = (req, res) => {
     const printer = new escpos.Printer(device, options);
 
     device.open(() => {
+      // --- ENCABEZADO ---
       printer
         .font("A")
         .align("CT")
         .style("B")
-        .text(`GASTO #${expenseId}`)
+        .text("VENTAS POR PRODUCTO")
+        .text(`CORTE #${shiftcutNumber}`)
         .style("NORMAL")
-        .text(`------------------------------`)
+        .feed(1)
         .align("LT")
-        .text(`Tipo de Gasto: ${expenseTypeName}`)
-        .text(`Método de Pago: ${paymentMethodName}`)
-        .text(`Cuenta Contable: ${accountingName}`)
-        .text(`Número de Cuenta: ${accountingNum}`)
-        .text(`Número de Documento: ${documentNumber}`)
-        .text(`Fecha Documento: ${documentDatetime}`)
-        .text(`------------------------------`)
-        .text(`Concepto: ${concept}`)
-        .text(`Descripción: ${description || '-'}`)
-        .text(`------------------------------`);
-
-      // --- DETALLE DE MONTOS ---
-      const values = [
-        { label: "Gravado", value: taxedAmount },
-        { label: "Exento", value: noTaxedAmount },
-        { label: "Bonos", value: bonus },
-        { label: "Descuentos", value: discounts },
-        { label: "IVA", value: iva },
-        { label: "FOVIAL", value: fovial },
-        { label: "COTRANS", value: cotrans },
-        { label: "RETE RENTA", value: reteRenta },
-        { label: "IVA Retenido", value: ivaRetention },
-        { label: "IVA Percibido", value: ivaPerception },
-      ];
-
-      values.forEach(({ label, value }) => {
-        if (+value > 0) {
-          printer.tableCustom([
-            { text: label, align: "LEFT", width: 0.7 },
-            { text: Number(value).toFixed(2), align: "RIGHT", width: 0.3 },
-          ]);
-        }
-      });
-
-      printer
-        .text(`------------------------------`)
+        .text(`Sucursal : ${locationName}`)
+        .text(`Caja     : ${cashierName}`)
+        .feed(1)
+        .align("CT")
+        .text(`----------------------------------------`)
+        .align("LT")
         .style("B")
         .tableCustom([
-          { text: "TOTAL", align: "LEFT", width: 0.7 },
-          { text: `$${Number(amount).toFixed(2)}`, align: "RIGHT", width: 0.3 },
+          { text: "PRODUCTO", align: "LEFT", width: 0.50 },
+          { text: "CANT.", align: "RIGHT", width: 0.20 },
+          { text: "TOTAL", align: "RIGHT", width: 0.29 },
         ])
         .style("NORMAL")
-        .feed(1)
-        .text(`Creado por: ${createdByFullname}`)
-        .text(`Anulado: ${isVoided ? "Sí" : "No"}`)
+        .align("CT")
+        .text(`----------------------------------------`)
+        .align("LT");
+
+      // --- DETALLE ---
+      let totalGeneral = 0;
+      let totalUnidades = 0;
+
+      let currentCategory = '';
+
+      for (let i = 0; i < bodyData.length; i++) {
+        const {
+          productName,
+          categoryName,
+          presentationName,
+          presentationsSold,
+          totalAmount,
+        } = bodyData[i];
+
+        totalGeneral += +totalAmount;
+        totalUnidades += +presentationsSold;
+
+        if (currentCategory !== categoryName) {
+          // IMPRIMIR CABECERA DE CATEGORIA
+          printer
+            .style("BI")
+            .tableCustom([
+              { text: categoryName, align: "LEFT", width: 0.70 },
+              { text: "", align: "RIGHT", width: 0.30 },
+            ]);
+        }
+
+        currentCategory = categoryName;
+
+        printer.style("NORMAL").tableCustom([
+          {
+            text: `${productName} (${presentationName})`,
+            align: "LEFT",
+            width: 0.50,
+          },
+          {
+            text: Number(presentationsSold).toFixed(2),
+            align: "RIGHT",
+            width: 0.20,
+          },
+          {
+            text: `$${Number(totalAmount).toFixed(2)}`,
+            align: "RIGHT",
+            width: 0.29,
+          },
+        ]);
+      }
+
+      // --- TOTALES FINALES ---
+      printer
+        .text(`----------------------------------------`)
+        .style("B")
+        .tableCustom([
+          { text: "TOTAL UNIDADES", align: "LEFT", width: 0.50 },
+          { text: Number(totalUnidades).toFixed(2), align: "RIGHT", width: 0.49 },
+        ])
+        .tableCustom([
+          { text: "TOTAL EFECTIVO", align: "LEFT", width: 0.50 },
+          { text: `$${Number(totalGeneral).toFixed(2)}`, align: "RIGHT", width: 0.49 },
+        ])
+        .style("NORMAL")
         .feed(2)
         .align("CT")
-        .style("B")
-        .feed(1)
         .text('____________________________')
-        .text('Firma')
+        .text('Firma Cajero')
         .feed(1)
-        .text("*** COMPROBANTE INTERNO ***")
+        .style("B")
+        .text("*** REPORTE INTERNO ***")
+        .style("NORMAL")
         .feed(2)
         .cut()
         .cashdraw(2)
@@ -1560,7 +1571,8 @@ controller.printShiftcutReportSalesAccumByPresentation = (req, res) => {
   } catch (err) {
     res.status(500).json({ status: 500, message: "Printer not found!", errorContent: err });
   }
-}
+};
+
 
 controller.printTransferVoucher = (req, res) => {
   try {

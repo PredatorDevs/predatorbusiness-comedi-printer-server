@@ -17,6 +17,7 @@ const {
   printDispatchOrderVoucher,
   printCF,
   printExpenseVoucher,
+  printShiftcutReportSalesAccumByPresentation,
   testPrinterConnection,
   testNetworkPrinterConnection,
   printTestPage,
@@ -43,6 +44,7 @@ router.get('/testpage', printTestPage);
 router.post('/ccf', printCCF);
 router.post('/cf', printCF);
 router.post('/expense-voucher', printExpenseVoucher);
+router.post('/shiftcut-report-sales-accum-by-presentation', printShiftcutReportSalesAccumByPresentation);
 router.post('/cfticket', printCFTicket);
 router.post('/internalsaleticket', printInternalSaleTicket);
 router.post('/dtevoucher', printDteVoucher);
