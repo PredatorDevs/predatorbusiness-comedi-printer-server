@@ -1326,6 +1326,242 @@ controller.printDteVoucher = (req, res) => {
   }
 }
 
+controller.printExpenseVoucher = (req, res) => {
+  try {
+    const { useNetworkPrint } = req.query;
+    const { expenseData, cashierPrinterIp, cashierPrinterPort } = req.body;
+
+    if (!expenseData) throw "You must provide expense data to print";
+
+    const {
+      expenseId,
+      expenseTypeName,
+      paymentMethodName,
+      accountingName,
+      accountingNum,
+      documentNumber,
+      documentDatetime,
+      concept,
+      description,
+      taxedAmount,
+      noTaxedAmount,
+      bonus,
+      discounts,
+      iva,
+      fovial,
+      cotrans,
+      reteRenta,
+      ivaRetention,
+      ivaPerception,
+      amount,
+      createdByFullname,
+      isVoided
+    } = expenseData;
+
+    console.log(expenseData);
+
+    // --- CONFIGURACIÓN DE DISPOSITIVO ---
+    let device;
+    if (+useNetworkPrint === 1)
+      device = new escpos.Network(cashierPrinterIp || "192.168.1.100", cashierPrinterPort || 9100);
+    else device = new escpos.USB(vId, pId);
+
+    const options = { encoding: "857", width: 48 };
+    const printer = new escpos.Printer(device, options);
+
+    device.open(() => {
+      printer
+        .font("A")
+        .align("CT")
+        .style("B")
+        .text(`GASTO #${expenseId}`)
+        .style("NORMAL")
+        .text(`------------------------------`)
+        .align("LT")
+        .text(`Tipo de Gasto: ${expenseTypeName}`)
+        .text(`Método de Pago: ${paymentMethodName}`)
+        .text(`Cuenta Contable: ${accountingName}`)
+        .text(`Número de Cuenta: ${accountingNum}`)
+        .text(`Número de Documento: ${documentNumber}`)
+        .text(`Fecha Documento: ${documentDatetime}`)
+        .text(`------------------------------`)
+        .text(`Concepto: ${concept}`)
+        .text(`Descripción: ${description || '-'}`)
+        .text(`------------------------------`);
+
+      // --- DETALLE DE MONTOS ---
+      const values = [
+        { label: "Gravado", value: taxedAmount },
+        { label: "Exento", value: noTaxedAmount },
+        { label: "Bonos", value: bonus },
+        { label: "Descuentos", value: discounts },
+        { label: "IVA", value: iva },
+        { label: "FOVIAL", value: fovial },
+        { label: "COTRANS", value: cotrans },
+        { label: "RETE RENTA", value: reteRenta },
+        { label: "IVA Retenido", value: ivaRetention },
+        { label: "IVA Percibido", value: ivaPerception },
+      ];
+
+      values.forEach(({ label, value }) => {
+        if (+value > 0) {
+          printer.tableCustom([
+            { text: label, align: "LEFT", width: 0.7 },
+            { text: Number(value).toFixed(2), align: "RIGHT", width: 0.3 },
+          ]);
+        }
+      });
+
+      printer
+        .text(`------------------------------`)
+        .style("B")
+        .tableCustom([
+          { text: "TOTAL", align: "LEFT", width: 0.7 },
+          { text: `$${Number(amount).toFixed(2)}`, align: "RIGHT", width: 0.3 },
+        ])
+        .style("NORMAL")
+        .feed(1)
+        .text(`Creado por: ${createdByFullname}`)
+        .text(`Anulado: ${isVoided ? "Sí" : "No"}`)
+        .feed(2)
+        .align("CT")
+        .style("B")
+        .feed(1)
+        .text('____________________________')
+        .text('Firma')
+        .feed(1)
+        .text("*** COMPROBANTE INTERNO ***")
+        .feed(2)
+        .cut()
+        .cashdraw(2)
+        .close((err) => {
+          if (err) res.json({ data: "Print error" });
+          else res.json({ data: "Print success" });
+        });
+    });
+  } catch (err) {
+    res.status(500).json({ status: 500, message: "Printer not found!", errorContent: err });
+  }
+};
+
+controller.printShiftcutReportSalesAccumByPresentation = (req, res) => {
+  try {
+    const { useNetworkPrint } = req.query;
+    const { expenseData, cashierPrinterIp, cashierPrinterPort } = req.body;
+
+    if (!expenseData) throw "You must provide expense data to print";
+
+    const {
+      expenseId,
+      expenseTypeName,
+      paymentMethodName,
+      accountingName,
+      accountingNum,
+      documentNumber,
+      documentDatetime,
+      concept,
+      description,
+      taxedAmount,
+      noTaxedAmount,
+      bonus,
+      discounts,
+      iva,
+      fovial,
+      cotrans,
+      reteRenta,
+      ivaRetention,
+      ivaPerception,
+      amount,
+      createdByFullname,
+      isVoided
+    } = expenseData;
+
+    console.log(expenseData);
+
+    // --- CONFIGURACIÓN DE DISPOSITIVO ---
+    let device;
+    if (+useNetworkPrint === 1)
+      device = new escpos.Network(cashierPrinterIp || "192.168.1.100", cashierPrinterPort || 9100);
+    else device = new escpos.USB(vId, pId);
+
+    const options = { encoding: "857", width: 48 };
+    const printer = new escpos.Printer(device, options);
+
+    device.open(() => {
+      printer
+        .font("A")
+        .align("CT")
+        .style("B")
+        .text(`GASTO #${expenseId}`)
+        .style("NORMAL")
+        .text(`------------------------------`)
+        .align("LT")
+        .text(`Tipo de Gasto: ${expenseTypeName}`)
+        .text(`Método de Pago: ${paymentMethodName}`)
+        .text(`Cuenta Contable: ${accountingName}`)
+        .text(`Número de Cuenta: ${accountingNum}`)
+        .text(`Número de Documento: ${documentNumber}`)
+        .text(`Fecha Documento: ${documentDatetime}`)
+        .text(`------------------------------`)
+        .text(`Concepto: ${concept}`)
+        .text(`Descripción: ${description || '-'}`)
+        .text(`------------------------------`);
+
+      // --- DETALLE DE MONTOS ---
+      const values = [
+        { label: "Gravado", value: taxedAmount },
+        { label: "Exento", value: noTaxedAmount },
+        { label: "Bonos", value: bonus },
+        { label: "Descuentos", value: discounts },
+        { label: "IVA", value: iva },
+        { label: "FOVIAL", value: fovial },
+        { label: "COTRANS", value: cotrans },
+        { label: "RETE RENTA", value: reteRenta },
+        { label: "IVA Retenido", value: ivaRetention },
+        { label: "IVA Percibido", value: ivaPerception },
+      ];
+
+      values.forEach(({ label, value }) => {
+        if (+value > 0) {
+          printer.tableCustom([
+            { text: label, align: "LEFT", width: 0.7 },
+            { text: Number(value).toFixed(2), align: "RIGHT", width: 0.3 },
+          ]);
+        }
+      });
+
+      printer
+        .text(`------------------------------`)
+        .style("B")
+        .tableCustom([
+          { text: "TOTAL", align: "LEFT", width: 0.7 },
+          { text: `$${Number(amount).toFixed(2)}`, align: "RIGHT", width: 0.3 },
+        ])
+        .style("NORMAL")
+        .feed(1)
+        .text(`Creado por: ${createdByFullname}`)
+        .text(`Anulado: ${isVoided ? "Sí" : "No"}`)
+        .feed(2)
+        .align("CT")
+        .style("B")
+        .feed(1)
+        .text('____________________________')
+        .text('Firma')
+        .feed(1)
+        .text("*** COMPROBANTE INTERNO ***")
+        .feed(2)
+        .cut()
+        .cashdraw(2)
+        .close((err) => {
+          if (err) res.json({ data: "Print error" });
+          else res.json({ data: "Print success" });
+        });
+    });
+  } catch (err) {
+    res.status(500).json({ status: 500, message: "Printer not found!", errorContent: err });
+  }
+}
+
 controller.printTransferVoucher = (req, res) => {
   try {
     const { useNetworkPrint } = req.query;
@@ -2402,7 +2638,7 @@ controller.printSaleDetailsToNetworkPrinter = (req, res) => {
 
 controller.printSettlementXTicket = (req, res) => {
   try {
-    const { useNetworkPrint } = req.query;
+    const { useNetworkPrint, isPreliminar } = req.query;
     const { settlementData, cashierPrinterIp, cashierPrinterPort } = req.body;
 
     let device;
@@ -2487,6 +2723,8 @@ controller.printSettlementXTicket = (req, res) => {
     //   newline: '\n'
     // });
 
+    console.log(isPreliminar)
+
     device.open(function (error) {
       printer
         .font('A')
@@ -2506,7 +2744,7 @@ controller.printSettlementXTicket = (req, res) => {
         .tableCustom([{ text: "Cierra", align: "LEFT", width: 0.25 }, { text: `${closedByFullname || ''}`, align: "LEFT", width: 0.75 }])
         .text('')
         .text('TICKET X')
-        .text('')
+        .text(isPreliminar == 1 ? '*** === > PRELIMINAR AL CORTE <=== ***' : '')
         .text('-----------------------------------------')
         .tableCustom([{ text: `${ticketLabel}`, align: "LEFT", width: 0.50 }, { text: ``, align: "RIGHT", width: 0.50 }])
         .tableCustom([{ text: `Venta Gravada:`, align: "LEFT", width: 0.50 }, { text: `${Number(ticketTaxableTotal || 0).toFixed(2)}`, align: "RIGHT", width: 0.50 }])
@@ -2541,7 +2779,8 @@ controller.printSettlementXTicket = (req, res) => {
         .tableCustom([{ text: `${ccfLabel}`, align: "LEFT", width: 0.50 }, { text: `${Number(ccfNumberOfTransactions || 0).toFixed(0)}`, align: "RIGHT", width: 0.50 }])
         .tableCustom([{ text: `Inicial`, align: "LEFT", width: 0.50 }, { text: `${Number(ccfInitialDocNumber || 0).toFixed(0)}`, align: "RIGHT", width: 0.50 }])
         .tableCustom([{ text: `Final`, align: "LEFT", width: 0.50 }, { text: `${Number(ccfFinalDocNumber || 0).toFixed(0)}`, align: "RIGHT", width: 0.50 }])
-        .feed(2)
+        .text(isPreliminar == 1 ? '*** === > PRELIMINAR AL CORTE <=== ***' : '')
+        .feed(1)
         .cut()
         .close((err) => {
           if (err) {
