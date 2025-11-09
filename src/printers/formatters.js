@@ -159,7 +159,7 @@ async function printPreCuentaTicket(printer, { details, place, waiter, status, c
         .tableCustom([
             { text: '', align: 'LEFT', width: 0.4 },
             { text: 'TOTAL:', align: 'LEFT', width: 0.2 },
-            { text: formatMoney(+place.total + (+tipAmount || 0)), align: 'LEFT', width: 0.2 },
+            { text: formatMoney(+place.total), align: 'LEFT', width: 0.2 },
         ])
         .style('NORMAL')
         .text('-----------------------------------------')
