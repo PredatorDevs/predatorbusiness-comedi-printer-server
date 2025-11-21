@@ -915,7 +915,6 @@ controller.printDteVoucher = (req, res) => {
       // console.log("Using network printer");
       // console.log(cashierPrinterIp || '192.168.1.100', cashierPrinterPort || 9100);
       device = new escpos.Network(cashierPrinterIp || '192.168.1.100', cashierPrinterPort || 9100);
-      console.log(req.body.cashierPrinterIp, req.body.cashierPrinterPort);
     } else {
       device = new escpos.USB(vId, pId);
     }
@@ -1020,6 +1019,7 @@ controller.printDteVoucher = (req, res) => {
       transmissionType,
       transmissionTypeName,
       tip,
+      cashReceived,
       userPINCodeFullName,
       voidedByFullname,
       notes
@@ -1256,13 +1256,25 @@ controller.printDteVoucher = (req, res) => {
           { text: `TOTAL A PAGAR`, align: "RIGHT", width: 0.75 },
           { text: `${Number(+total + +(tip || 0) - (isNoTaxableOperation ? +ivaTaxAmount : 0) - +IVAretention + +IVAperception).toFixed(2) || 0}`, align: "RIGHT", width: 0.25 }
         ])
+        .feed(1);
+      
+      printer
+        .tableCustom([
+          { text: `($$$) RECIBIDO`, align: "RIGHT", width: 0.75 },
+          { text: `${Number(cashReceived || 0).toFixed(2)}`, align: "RIGHT", width: 0.25 }
+        ])
+        .tableCustom([
+          { text: `SU CAMBIO`, align: "RIGHT", width: 0.75 },
+          { text: `${Number((cashReceived || 0) - (+total + +(tip || 0) - (isNoTaxableOperation ? +ivaTaxAmount : 0) - +IVAretention + +IVAperception)).toFixed(2)}`, align: "RIGHT", width: 0.25 }
+        ]);
+        // .text('------------------------------------------')
         // .tableCustom([
         //   { text: `TOTAL`, align: "LEFT", width: 0.30 },
         //   { text: ``, align: "LEFT", width: 0.25 },
         //   { text: ``, align: "RIGHT", width: 0.25 },
         //   { text: `${total || 0}`, align: "RIGHT", width: 0.20 }
         // ])
-        .align('CT')
+      printer.align('CT')
         .feed(1)
         .text(`CODIGO DE GENERACION:`)
         .text(`${generationCode}`)
