@@ -484,6 +484,8 @@ controller.printTestPage = (req, res) => {
         .text(`You are printing from ${remoteAddress || ''}`)
         .feed(5)
         .text('HELLO WORLD')
+        .align('CT')
+        .barcode('123456789', 'EAN8')
         .feed(2)
         .control('FF')
         .cut()
