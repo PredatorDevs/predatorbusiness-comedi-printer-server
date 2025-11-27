@@ -476,28 +476,93 @@ controller.printTestPage = (req, res) => {
     const remoteAddress = req.headers['x-real-ip'] || req.connection.remoteAddress;
 
     device.open(function (error) {
+      const now = new Date();
+      const formatDate = now.toLocaleDateString();
+      const formatTime = now.toLocaleTimeString();
+      const clientIp = remoteAddress || 'Unknown';
+
       printer
-        .font('A')
-        .align('LT')
-        .style('NORMAL')
-        .size(0, 0)
-        .text(`You are printing from ${remoteAddress || ''}`)
-        .feed(5)
-        .text('HELLO WORLD')
+        // ============= ENCABEZADO =============
+        // .align('CT')
+        // .style('B')
+        // .size(0, 0)
+        // .text('*********************')
+        // .text('*    SigProCOM    *') // Cambia aquí tu marca
+        // .text('*********************')
+        // .feed(1)
+        
+        // ============= LOGO ASCII =============
         .align('CT')
-        .barcode('123456789', 'EAN8')
-        .feed(2)
-        .control('FF')
-        .cut()
-        .feed(2)
-        .close((err) => {
-          if (err) {
-            res.status(500).json({ status: 500, message: 'Printer connection failed!', errorContent: err });
-          } else {
-            res.json({ data: "Printer connection success!" });
-          }
-        });
-    });
+        .size(0, 0)
+        .style('NORMAL')
+        // .text('   ___       __                  ')
+        // .text('  / _ \\___  / /__ ___ _  ___ ___ ')
+        // .text(' / , _/ _ \\/ / -_) _ `/ (_-</ -_)')
+        // .text('/_/|_|\\___/_/\\__/\\_,_/ /___/\\__/ ')
+        .text('  _________.__      __________                ')
+        .text(' /   _____/|__| ____\______   \_______  ____  ')
+        .text(' \_____  \ |  |/ ___\|     ___/\_  __ \/  _ \ ')
+        .text(' /        \|  / /_/  >    |     |  | \(  <_> )')
+        .text('/_______  /|__\___  /|____|     |__|   \____/ ')
+        .text('        \/   /_____/                          ')
+
+        // ============= BORDE SUPERIOR =============
+        .text('================================')
+        .align('CT')
+        .text('      PRUEBA DE IMPRESIÓN')
+        .text('================================')
+
+        // ============= INFO GENERAL =============
+        .align('LT')
+        .text(`Fecha: ${formatDate}`)
+        .text(`Hora:  ${formatTime}`)
+        .text(`IP del Cliente: ${clientIp}`)
+        .feed(1)
+
+        // ============= DIAGNÓSTICO =============
+        .text('Diagnóstico de instalación:')
+        .text('[v] Conexión establecida')
+        .text('[v] Comunicación correcta con impresora')
+        .text('[v] Driver ESC/POS activo')
+        .text('[v] Codificación aplicada correctamente')
+        // ============= BORDE =============
+        .align('CT')
+        .text('--------------------------------')
+        // ============= QR CODE =============
+        // QR de tu sitio, WhatsApp o panel de cliente
+        .qrimage('https://sigprocom.vercel.app', { type: 'png', mode: 'dhdw', size: 3 }, function (err) {
+          console.log(err);
+          // ============= DATOS DE CONTACTO =============
+          printer.align('CT')
+          .text('Escanea el código QR')
+          .text('para más información')
+          .feed(1)
+          .text('--------------------------------')
+          .text('CONTACTO Y SOPORTE')
+          .text('--------------------------------')
+          .align('LT')
+          .text('Teléfono: +503 7260-2996')
+          .text('Email: info@sigpro.dev')
+          .text('Web: https://sigprocom.vercel.app')
+          // ============= MENSAJE FINAL =============
+          .align('CT')
+          .text('================================')
+          .text('Gracias por confiar en nosotros')
+          .text('Su impresora está funcionando')
+          .text('correctamente')
+          .text('================================')
+          .feed(1)
+          .cut()
+          .close((err) => {
+            if (err) {
+              res.status(500).json({ status: 500, message: 'Printer connection failed!', errorContent: err });
+            } else {
+              res.json({ data: "Printer connection success!" });
+            }
+          });
+        })
+      });
+
   } catch (err) {
     console.log(err);
     res.status(500).json({ status: 500, message: 'Printer not found!', errorContent: err });
