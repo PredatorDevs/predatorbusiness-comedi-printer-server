@@ -1089,6 +1089,7 @@ controller.printDteVoucher = (req, res) => {
       cashReceived,
       userPINCodeFullName,
       voidedByFullname,
+      dteVoucherFooterMessage,
       notes
     } = invoiceHeaderData;
 
@@ -1386,6 +1387,9 @@ controller.printDteVoucher = (req, res) => {
           `https://admin.factura.gob.sv/consultaPublica?ambiente=01&codGen=${generationCode || ''}&fechaEmi=${dayjs(docDatetime).format('YYYY-MM-DD') || ''}`,
           { type: 'png', mode: 'dhdw', size: 3 },
           function (err) {
+            if (dteVoucherFooterMessage) {
+              this.text(dteVoucherFooterMessage || '');
+            }
             this.text('*** ESTE COMPROBANTE NO TIENE EFECTO FISCAL ***');
             this.feed(2);
             this.cut();
