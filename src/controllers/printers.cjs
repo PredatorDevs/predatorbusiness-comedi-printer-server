@@ -1102,7 +1102,7 @@ controller.printDteVoucher = (req, res) => {
         .font('A')
         .align('CT')
         .style('NORMAL')
-        .size(0, 0);
+        .size(1, 0);
       
       if (ownerTradename) printer.text(ownerTradename.toUpperCase() || '');
       if (ownerName) printer.text(ownerName.toUpperCase() || '');
