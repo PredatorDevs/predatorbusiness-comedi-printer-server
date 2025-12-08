@@ -1105,6 +1105,9 @@ controller.printDteVoucher = (req, res) => {
         .size(1, 0);
       
       if (ownerTradename) printer.text(ownerTradename.toUpperCase() || '');
+
+      printer.size(0, 0);
+
       if (ownerName) printer.text(ownerName.toUpperCase() || '');
       if (ownerActivityDescription) printer.text(`${ownerActivityDescription}`.toUpperCase() || '');
 
