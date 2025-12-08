@@ -1106,7 +1106,7 @@ controller.printDteVoucher = (req, res) => {
       
       if (ownerTradename) printer.text(ownerTradename.toUpperCase() || '');
       if (ownerName) printer.text(ownerName.toUpperCase() || '');
-      if (ownerActivityDescription) printer.text(`Giro: ${ownerActivityDescription}`.toUpperCase() || '');
+      if (ownerActivityDescription) printer.text(`${ownerActivityDescription}`.toUpperCase() || '');
 
       printer
         .text(`NIT: ${ownerNit || ''} - NRC: ${ownerNrc || ''}`)
