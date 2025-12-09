@@ -1043,6 +1043,7 @@ controller.printDteVoucher = (req, res) => {
       generationCode,
       id: currentSaleId,
       isNoTaxableOperation,
+      isNoSubjectOperation,
       isVoided,
       IVAperception,
       IVAretention,
@@ -1207,7 +1208,7 @@ controller.printDteVoucher = (req, res) => {
         printer.style('U').tableCustom([
           // { text: `${Number(invoiceBodyData[i].quantity).toFixed(0) || 0}`, align: "LEFT", width: 0.15 },
           // { text: `${"UNID"} x`, align: "LEFT", width: 0.25 },
-          { text: `${Number(quantity).toFixed(4) || 0} x $${(+unitPrice - (+unitPriceFovial + +unitPriceCotrans + +unitPriceTourism + (isNoTaxableOperation ? +unitPriceIva : 0))).toFixed(4) || 0}`, align: "LEFT", width: 0.50 },
+          { text: `${Number(quantity).toFixed(4) || 0} x $${(+unitPrice - (+unitPriceFovial + +unitPriceCotrans + +unitPriceTourism + (isNoTaxableOperation || (documentTypeId === 3 || documentTypeId === 4) ? +unitPriceIva : 0))).toFixed(4) || 0}`, align: "LEFT", width: 0.50 },
           { text: `${(isNoTaxableOperation === 1 ? (+noTaxableSubTotal - +ivaTaxAmount - +fovialTaxAmount - +cotransTaxAmount - +tourismTaxAmount) : (+taxableSubTotal - ((documentTypeId === 1 || documentTypeId === 2) ? 0 : +ivaTaxAmount) - +fovialTaxAmount - +cotransTaxAmount - +tourismTaxAmount)).toFixed(4) || 0}`, align: "RIGHT", width: 0.50 }
         ]);
 
