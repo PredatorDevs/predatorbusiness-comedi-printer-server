@@ -34,7 +34,17 @@ controller.printManager = async (req, res) => {
       return res.status(400).json({ message: 'Invalid details' });
     }
 
-    device = new escpos.Network(ip, port);
+    if (
+      type === 'kitchen-offline' ||
+      type === 'precheck-offline'
+    ) {
+      device = new escpos.USB(vId, pId);
+    } else {
+      device = new escpos.Network(ip, port);
+    }
+
+    // device = new escpos.Network(ip, port);
+
     const options = { encoding: "857", width: 56 }
     const printer = new escpos.Printer(device, options);
 
@@ -51,7 +61,13 @@ controller.printManager = async (req, res) => {
 
     if (type === 'kitchen') {
       await formatters.kictchenPrinter(printer, { name, details, place, waiter, status, customerName })
+    } else if (type === 'kitchen-offline') {
+      // Offline kitchen printer logic can be implemented here
+      await formatters.kictchenPrinter(printer, { name, details, place, waiter, status, customerName })
     } else if (type === 'precheck') {
+      await formatters.printPreCuentaTicket(printer, { name, details, place, waiter, status, customerName, tipAmount, customerAddress, customerPhone });
+    } else if (type === 'precheck-offline') {
+      // Offline precheck printer logic can be implemented here
       await formatters.printPreCuentaTicket(printer, { name, details, place, waiter, status, customerName, tipAmount, customerAddress, customerPhone });
     }
 
