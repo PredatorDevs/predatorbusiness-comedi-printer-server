@@ -113,7 +113,7 @@ async function printPreCuentaTicket(printer, { details, place, waiter, status, c
         .text(`Fecha: ${formatDate()}`)
         .text(`Hora: ${formatTime()}`)
         .text(customerName || place.customerName ? `Cliente: ${customerName || place.customerName || ''}` : '')
-        // .text(`${place.placetypename}: ${place.placeNumber}`)
+        .text(`${place.placetypename}: ${place.placeNumber}`)
         .text(customerAddress || place.customerAddress ? `Direccion: ${customerAddress || place.customerAddress || ''}` : '')
         .text(customerPhone || place.customerPhone ? `Teléfono: ${customerPhone || place.customerPhone || ''}` : '')
         .feed(1)
@@ -139,6 +139,14 @@ async function printPreCuentaTicket(printer, { details, place, waiter, status, c
             { text: item.productName.slice(0, 28), align: 'LEFT', width: 0.5 },
             { text: formatMoney(item.subTotal), align: 'LEFT', width: 0.2 },
         ]);
+
+        if (item?.comments && item.comments.trim() !== '') {
+            printer.tableCustom([
+                { text: '', align: 'LEFT', width: 0.1 },
+                { text: `${item?.comments.slice(0, 48)}`, align: 'LEFT', width: 0.5 },
+                { text: '', align: 'LEFT', width: 0.2 }
+            ]);
+        }
     }
 
     console.log(place);
