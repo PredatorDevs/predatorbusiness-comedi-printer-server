@@ -987,6 +987,38 @@ controller.printInternalSaleTicket = (req, res) => {
   }
 }
 
+controller.openCashDrawer = (req, res) => {
+  try {
+    const { useNetworkPrint } = req.query;
+    const { cashierPrinterIp, cashierPrinterPort } = req.body;
+
+    let device;
+
+    if (+useNetworkPrint === 1) {
+      device = new escpos.Network(cashierPrinterIp || '192.168.1.100', cashierPrinterPort || 9100);
+    } else {
+      device = new escpos.USB(vId, pId);
+    }
+
+    const options = { encoding: "857", width: 48 /* default */ }
+    const printer = new escpos.Printer(device, options);
+
+    device.open(function (error) {
+      printer
+        .cashdraw(2)
+        .close((err) => {
+          if (err) {
+            res.status(500).json({ status: 500, message: 'Cash drawer open failed!', errorContent: err });
+          } else {
+            res.json({ data: "Cash drawer opened successfully!" });
+          }
+        });
+    });
+  } catch (err) {
+    res.status(500).json({ status: 500, message: 'Cash drawer open failed!', errorContent: err });
+  }
+}
+
 controller.printDteVoucher = (req, res) => {
   try {
     const { useNetworkPrint } = req.query;

@@ -11,6 +11,7 @@ const {
   printPackOff,
   printCFTicket,
   printInternalSaleTicket,
+  openCashDrawer,
   printDteVoucher,
   printTransferVoucher,
   printOrderSaleVoucher,
@@ -34,6 +35,7 @@ router.get('/print-guide-lines', printGuideLines);
 router.get('/print-char-line', printCharLine);
 
 router.get('/test-cashdrawer-open', testCashdrawerOpenAction);
+router.post('/open-cash-drawer', openCashDrawer);
 
 router.post('/manager', printManager);
 
