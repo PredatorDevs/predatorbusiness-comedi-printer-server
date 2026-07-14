@@ -1,3 +1,21 @@
 PARA PAGINA DE PRUEBA:
 
 http://127.0.0.1:5005/api/printer/testpage
+
+PARA PAGINA DE PRUEBA USANDO HTTPS:
+
+https://127.0.0.1:5005/api/printer/testpage
+
+CON PARÁMETROS PARA IMPRESORA:
+
+ENDPOINT PARA PROBAR IMPRESORA VIA RED USANDO HTTP:
+http://127.0.0.1:5005/api/printer/testpage/?pMode=network&pIp=192.168.1.150&pPort=9100
+
+ENDPOINT PARA PROBAR IMPRESORA VIA RED USANDO HTTPS:
+https://127.0.0.1:5005/api/printer/testpage/?pMode=network&pIp=192.168.1.150&pPort=9100
+
+ENDPOINT PARA PROBAR IMPRESORA VIA USB USANDO HTTP:
+http://127.0.0.1:5005/api/printer/testpage/?pMode=usb
+
+ENDPOINT PARA PROBAR IMPRESORA VIA RED USANDO HTTPS:
+https://127.0.0.1:5005/api/printer/testpage/?pMode=usb
