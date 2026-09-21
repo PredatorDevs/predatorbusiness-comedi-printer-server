@@ -1056,6 +1056,7 @@ controller.printDteVoucher = (req, res) => {
     }
 
     const {
+      companyId,
       cashierId,
       controlNumber,
       cotransTaxAmount,
@@ -1149,6 +1150,8 @@ controller.printDteVoucher = (req, res) => {
       userPINCodeFullName,
       voidedByFullname,
       dteVoucherFooterMessage,
+      deliveryRouteName,
+      sellerPINCodeFullName,
       notes
     } = invoiceHeaderData;
 
@@ -1199,6 +1202,21 @@ controller.printDteVoucher = (req, res) => {
         .text(`NRC: ${customerNrc || '-'}`);
       }
 
+      if (
+        companyId === 3
+        || companyId === 4
+        || companyId === 2
+        || companyId === 8
+      ) {
+        if (sellerPINCodeFullName && sellerPINCodeFullName !== '-') {
+          printer.text(`Vendedor: ${sellerPINCodeFullName}`);
+        }
+
+        if (deliveryRouteName && deliveryRouteName !== 'NO ASIGNADA') {
+          printer.text(`Ruta: ${deliveryRouteName}`);
+        }
+      }
+      
       printer.feed(1) // LINE 9
         .align('CT')
         // .text('------------------------------------------------')
