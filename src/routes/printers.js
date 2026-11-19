@@ -22,6 +22,7 @@ const {
   testPrinterConnection,
   testNetworkPrinterConnection,
   printTestPage,
+  printTestImage,
   printGuideLines,
   printCharLine,
   printSaleDetailsToNetworkPrinter,
@@ -43,6 +44,7 @@ router.get('/test-network', testNetworkPrinterConnection);
 router.get('/test', testPrinterConnection);
 router.post('/validate-connection', validatePrinterConnection);
 router.get('/testpage', printTestPage);
+router.get('/testpageimage', printTestImage);
 router.post('/ccf', printCCF);
 router.post('/cf', printCF);
 router.post('/expense-voucher', printExpenseVoucher);

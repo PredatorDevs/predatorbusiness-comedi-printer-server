@@ -1,6 +1,8 @@
 const escpos = require('escpos');
 const dayjs = require('dayjs');
+const axios = require('axios');
 const fs = require('fs');
+const path = require('path');
 const ping = require('ping');
 const { exec } = require('child_process');
 const { default: formatters } = require('../printers/formatters');
@@ -480,6 +482,63 @@ async function checkPrinterOnline(ipAddress) {
   }
 }
 
+controller.printTestImage = async (req, res) => {
+  try {
+    const { pMode, pIp, pPort } = req.query;
+
+    let device;
+
+    if (pMode === 'usb') {
+      device = new escpos.USB(vId, pId);
+    } else if (pMode === 'network') {
+      device = new escpos.Network(pIp || '127.0.0.1', pPort || 9100);
+    } else {
+      device = new escpos.USB(vId, pId);
+    }
+
+    // const device = new escpos.Network('172.26.96.1', 9101);
+    // const device = new escpos.Network('192.168.0.4', 9101);
+
+    const imageUrl = 'https://mysigprobucket.s3.amazonaws.com/sigprocom-logos/44e23e63-ee2f-4a3f-adc2-35d293570073_sigpro-transparente-oscuro-tiny4.png';
+    const imagePath = path.resolve('sigpro-transparente-tiny3.png');
+
+    const response = await axios.get(imageUrl, {
+        responseType: 'arraybuffer'
+    });
+
+    fs.writeFileSync(imagePath, response.data);
+
+    const options = { encoding: "857", width: 56 /* default */ }
+    const printer = new escpos.Printer(device, options);
+
+    const remoteAddress = req.headers['x-real-ip'] || req.connection.remoteAddress;
+
+    escpos.Image.load(imagePath, (image) => {
+        device.open((error) => {
+            if (error) return console.error(error);
+
+            printer
+                .align('ct')
+                .image(image, 's24')
+                .then(() => {
+                    printer.text('================================')
+                    .align('CT')
+                    .text('      PRUEBA DE IMPRESIÓN')
+                    .text('================================');
+                    printer.cut();
+                    printer.close();
+
+                    fs.unlinkSync(imagePath);
+                })
+                .catch(console.error);
+        });
+    });
+  } catch (err) {
+    console.log(err);
+    res.status(500).json({ status: 500, message: 'Printer not found!', errorContent: err });
+  }
+}
+
 controller.printTestPage = (req, res) => {
   try {
     const { pMode, pIp, pPort } = req.query;
@@ -525,12 +584,12 @@ controller.printTestPage = (req, res) => {
         // .text('  / _ \\___  / /__ ___ _  ___ ___ ')
         // .text(' / , _/ _ \\/ / -_) _ `/ (_-</ -_)')
         // .text('/_/|_|\\___/_/\\__/\\_,_/ /___/\\__/ ')
-        .text('  _________.__      __________                ')
-        .text(' /   _____/|__| ____\______   \_______  ____  ')
-        .text(' \_____  \ |  |/ ___\|     ___/\_  __ \/  _ \ ')
-        .text(' /        \|  / /_/  >    |     |  | \(  <_> )')
-        .text('/_______  /|__\___  /|____|     |__|   \____/ ')
-        .text('        \/   /_____/                          ')
+        // .text('  _________.__      __________                ')
+        // .text(' /   _____/|__| ____\______   \_______  ____  ')
+        // .text(' \_____  \ |  |/ ___\|     ___/\_  __ \/  _ \ ')
+        // .text(' /        \|  / /_/  >    |     |  | \(  <_> )')
+        // .text('/_______  /|__\___  /|____|     |__|   \____/ ')
+        // .text('        \/   /_____/                          ')
 
         // ============= BORDE SUPERIOR =============
         .text('================================')
