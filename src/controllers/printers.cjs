@@ -2,6 +2,7 @@ const escpos = require('escpos');
 const dayjs = require('dayjs');
 const axios = require('axios');
 const fs = require('fs');
+const os = require('os');
 const path = require('path');
 const ping = require('ping');
 const { exec } = require('child_process');
@@ -496,43 +497,104 @@ controller.printTestImage = async (req, res) => {
       device = new escpos.USB(vId, pId);
     }
 
-    // const device = new escpos.Network('172.26.96.1', 9101);
-    // const device = new escpos.Network('192.168.0.4', 9101);
-
     const imageUrl = 'https://mysigprobucket.s3.amazonaws.com/sigprocom-logos/44e23e63-ee2f-4a3f-adc2-35d293570073_sigpro-transparente-oscuro-tiny4.png';
     const imagePath = path.resolve('sigpro-transparente-tiny3.png');
-
-    const response = await axios.get(imageUrl, {
-        responseType: 'arraybuffer'
-    });
-
-    fs.writeFileSync(imagePath, response.data);
 
     const options = { encoding: "857", width: 56 /* default */ }
     const printer = new escpos.Printer(device, options);
 
-    const remoteAddress = req.headers['x-real-ip'] || req.connection.remoteAddress;
+    try {
 
-    escpos.Image.load(imagePath, (image) => {
-        device.open((error) => {
-            if (error) return console.error(error);
+        // 1. Abrir el dispositivo UNA SOLA VEZ
+        await new Promise((resolve, reject) => {
+            device.open((error) => {
+                if (error) reject(error);
+                else resolve();
+            });
+        });
+
+        // 2. Imprimir cabecera (logo opcional)
+        if (imageUrl) {
+
+            const response = await axios.get(imageUrl, {
+                responseType: 'arraybuffer'
+            });
+
+            fs.writeFileSync(imagePath, response.data);
+
+            const image = await new Promise((resolve, reject) => {
+                escpos.Image.load(imagePath, (image) => {
+                    if (!image) reject(new Error('No se pudo cargar el logo'));
+                    else resolve(image);
+                });
+            });
 
             printer
-                .align('ct')
-                .image(image, 's24')
-                .then(() => {
-                    printer.text('================================')
-                    .align('CT')
-                    .text('      PRUEBA DE IMPRESIÓN')
-                    .text('================================');
-                    printer.cut();
-                    printer.close();
+                .align('ct');
 
-                    fs.unlinkSync(imagePath);
-                })
-                .catch(console.error);
+            await printer.image(image, 's24');
+
+            printer
+                .feed(1);
+        }
+
+        // 3. Continuar con el contenido del ticket
+        printer
+            .align('ct')
+            .style('b')
+            .text('SUPERMERCADO LA BENDICIÓN')
+            .style('normal')
+            .text('Comprobante de venta')
+            .drawLine();
+
+        printer
+            .align('lt')
+            .text('Producto 1       $10.00')
+            .text('Producto 2       $15.00')
+            .drawLine();
+
+        printer
+            .align('rt')
+            .style('b')
+            .text('TOTAL: $25.00');
+
+        // 4. Finalizar
+        printer.cut();
+
+        await new Promise((resolve) => {
+            printer.close(resolve);
         });
-    });
+
+    } catch (error) {
+        console.error('Error imprimiendo ticket:', error);
+        throw error;
+
+    } finally {
+        if (fs.existsSync(imagePath)) {
+            fs.unlinkSync(imagePath);
+        }
+    }
+
+    // escpos.Image.load(imagePath, (image) => {
+    //     device.open((error) => {
+    //         if (error) return console.error(error);
+
+    //         printer
+    //             .align('ct')
+    //             .image(image, 's24')
+    //             .then(() => {
+    //                 printer.text('================================')
+    //                 .align('CT')
+    //                 .text('      PRUEBA DE IMPRESIÓN')
+    //                 .text('================================');
+    //                 printer.cut();
+    //                 printer.close();
+
+    //                 fs.unlinkSync(imagePath);
+    //             })
+    //             .catch(console.error);
+    //     });
+    // });
   } catch (err) {
     console.log(err);
     res.status(500).json({ status: 500, message: 'Printer not found!', errorContent: err });
@@ -1088,95 +1150,73 @@ controller.openCashDrawer = (req, res) => {
   }
 }
 
-controller.printDteVoucher = (req, res) => {
+controller.printDteVoucher = async (req, res) => {
+  let device;
+  let printer;
+  let tempLogoPath;
+
+  const cleanupTempLogo = async () => {
+    if (tempLogoPath) {
+      try {
+        await fs.promises.unlink(tempLogoPath);
+      } catch (error) {
+        // No impedir la finalización de la impresión por limpieza.
+      }
+      tempLogoPath = null;
+    }
+  };
+
+  const sendPrintError = async (error) => {
+    await cleanupTempLogo();
+
+    if (!res.headersSent) {
+      res.status(500).json({
+        status: 500,
+        message: 'Printer error!',
+        errorContent: error?.message || error
+      });
+    }
+  };
+
   try {
     const { useNetworkPrint } = req.query;
-    const { invoiceHeaderData, invoiceBodyData, cashierPrinterIp, cashierPrinterPort } = req.body;
 
-    let device;
-
-    if (+useNetworkPrint === 1) {
-      // console.log("Using network printer");
-      // console.log(cashierPrinterIp || '192.168.1.100', cashierPrinterPort || 9100);
-      device = new escpos.Network(cashierPrinterIp || '192.168.1.100', cashierPrinterPort || 9100);
-    } else {
-      device = new escpos.USB(vId, pId);
-    }
-    // const device  = new escpos.USB(vId, pId);
-    // const device = new escpos.Network('127.0.0.1', 9105);
-    const options = { encoding: "857", width: 48 /* default */ }
-    const printer = new escpos.Printer(device, options);
-
-    // invoiceHeaderData = { customerFullname, documentDatetime, customerAddress, customerDui, customerNit, customerPhone, totalSale, totalToLetters }
-    // invoiceBodyData = [{ quantity, description, unitPrice, subTotal }]
+    const {
+      invoiceHeaderData,
+      invoiceBodyData,
+      cashierPrinterIp,
+      cashierPrinterPort
+    } = req.body;
 
     if (invoiceHeaderData === undefined || invoiceBodyData === undefined) {
-      throw "You must provide a header and body sale data to print";
+      throw new Error('You must provide a header and body sale data to print');
+    }
+
+    if (!Array.isArray(invoiceBodyData)) {
+      throw new Error('invoiceBodyData must be an array');
     }
 
     const {
       companyId,
-      cashierId,
       controlNumber,
-      cotransTaxAmount,
-      createdBy,
-      createdByFullname,
-      currencyType,
-      customerAddress,
-      customerBusinessLine,
-      customerCityMhCode,
-      customerCityName,
-      customerCode,
-      customerDefPhoneNumber,
-      customerDepartmentMhCode,
-      customerDepartmentName,
       customerDui,
-      customerEconomicActivityCode,
-      customerEconomicActivityName,
-      customerEmail,
       customerFullname,
       customerId,
       customerNit,
       customerNrc,
-      customerOccupation,
-      docDate,
       docDatetime,
-      docDatetimeFormatted,
-      docDatetimeLabel,
-      docNumber,
-      docTime,
       documentTypeId,
       documentTypeName,
-      dteTransmitionStatus,
       dteTransmitionStatusName,
-      dteType,
-      establishmentType,
-      estCodeInternal,
-      estCodeMH,
-      expirationDays,
-      expirationInformation,
-      expired,
-      expiresIn,
-      fovialTaxAmount,
       generationCode,
-      id: currentSaleId,
       isNoTaxableOperation,
-      isNoSubjectOperation,
-      isVoided,
       IVAperception,
       IVAretention,
       ivaTaxAmount,
       locationAddress,
-      locationCityMhCode,
-      locationCityName,
-      locationDepartmentMhCode,
-      locationDepartmentName,
-      locationEmail,
-      locationId,
       locationName,
       locationPhone,
-      noTaxableSubTotal,
-      ownerActivityCode,
+      locationReceiptLogoUrl,
       ownerActivityDescription,
       ownerName,
       ownerNit,
@@ -1184,379 +1224,647 @@ controller.printDteVoucher = (req, res) => {
       ownerTradename,
       order_type,
       orderCustomerComplementaryName,
-      paymentStatus,
-      paymentStatusName,
-      paymentTypeId,
       paymentTypeName,
-      posCodeInternal,
-      posCodeMH,
       receptionStamp,
-      saleTotalPaid,
-      serie,
-      shiftcutId,
       taxableSubTotal,
       taxableSubTotalWithoutTaxes,
       total,
-      totalInLetters,
-      totalTaxes,
-      tourismTaxAmount,
-      transmissionModel,
       transmissionModelName,
-      transmissionType,
       transmissionTypeName,
       tip,
       cashReceived,
-      userPINCodeFullName,
-      voidedByFullname,
       dteVoucherFooterMessage,
       deliveryRouteName,
       sellerPINCodeFullName,
-      notes
+      fovialTaxAmount,
+      cotransTaxAmount,
+      tourismTaxAmount
     } = invoiceHeaderData;
 
-    let totalToLettersSplited = (totalInLetters || " ( ").split("(", 2);
-    let totalToLettersPartOne = totalToLettersSplited[0];
-    let totalToLettersPartTwo = `(${totalToLettersSplited[1]}`;
+    // =====================================================
+    // 1. DESCARGAR Y CARGAR LOGO (OPCIONAL)
+    // =====================================================
 
-    device.open(function (error) {
-      printer
-        .font('A')
-        .align('CT')
-        .style('NORMAL')
-        .size(1, 0);
-      
-      if (ownerTradename) printer.text(String(ownerTradename).toUpperCase() || '');
+    let logoImage = null;
 
-      printer.size(0, 0);
+    const logoUrl = typeof locationReceiptLogoUrl === 'string'
+      ? locationReceiptLogoUrl.trim()
+      : '';
 
-      if (ownerName) printer.text(ownerName.toUpperCase() || '');
-      if (ownerActivityDescription) printer.text(`${ownerActivityDescription}`.toUpperCase() || '');
+    if (logoUrl) {
+      try {
+        const response = await axios.get(logoUrl, {
+          responseType: 'arraybuffer',
+          timeout: 10000,
+          maxContentLength: 5 * 1024 * 1024,
+          maxBodyLength: 5 * 1024 * 1024
+        });
 
-      printer
-        .text(`NIT: ${ownerNit || ''} - NRC: ${ownerNrc || ''}`)
-        .text(locationAddress || '')
-        .text(locationPhone || '')
-        // .text('*** TICKET DE CONTROL INTERNO ***')
-        // .text(`NIT: ${'0000-000000-000-0'} - NRC: ${'00000-0'}`)
-        .feed(1)
-        .align('LT')
-        .tableCustom([
-          { text: `COD INTERNO: ${currentSaleId}`, align: "LEFT", width: 0.50 },
-          { text: `COND: ${String(paymentTypeName).toUpperCase()}`, align: "RIGHT", width: 0.50 }
-        ])
-        .tableCustom([
-          { text: `DOC: ${documentTypeName}`, align: "LEFT", width: 0.50 },
-          { text: `SUC: ${String(locationName).toUpperCase()}`, align: "RIGHT", width: 0.50 }
-        ])
-        .text(`FECHA: ${dayjs(docDatetime).format('YYYY-MM-DD hh:mm:ss')}`)
-        .text(`CLIENTE: ${customerFullname}`);
+        const contentType = String(
+          response.headers['content-type'] || ''
+        ).toLowerCase();
 
-      if (order_type === 'domicilio') {
-        if (orderCustomerComplementaryName) printer.text(`DOMICILIO PARA: ${orderCustomerComplementaryName}`);
-      }
+        let extension = '.png';
 
-      if (customerId !== 1) {
-        printer.text(`DUI: ${customerDui || '-'}`)
-        .text(`NIT: ${customerNit || '-'}`)
-        .text(`NRC: ${customerNrc || '-'}`);
-      }
-
-      if (
-        companyId === 3
-        || companyId === 4
-        || companyId === 2
-        || companyId === 8
-      ) {
-        if (sellerPINCodeFullName && sellerPINCodeFullName !== '-') {
-          printer.text(`Vendedor: ${sellerPINCodeFullName}`);
+        if (contentType.includes('jpeg') || contentType.includes('jpg')) {
+          extension = '.jpg';
+        } else if (contentType.includes('png')) {
+          extension = '.png';
+        } else {
+          throw new Error(`Unsupported logo image format: ${contentType}`);
         }
 
-        if (deliveryRouteName && deliveryRouteName !== 'NO ASIGNADA') {
-          printer.text(`Ruta: ${deliveryRouteName}`);
-        }
-      }
-      
-      printer.feed(1) // LINE 9
-        .align('CT')
-        // .text('------------------------------------------------')
-        // .tableCustom([
-        //   { text: `DESCRIPCION`, align: "LEFT", width: 1 }
-        // ])
-        // .style('U')
-        .tableCustom([
-          // { text: `CANT.`, align: "LEFT", width: 0.15 },
-          { text: `DESCRIPCION`, align: "LEFT", width: 0.55 },
-          // { text: `PRES.`, align: "LEFT", width: 0.25 },
-          { text: ``, align: "RIGHT", width: 0.25 },
-          { text: `SUBTOTAL`, align: "RIGHT", width: 0.20 }
-        ])
-        .text('------------------------------------------------')
-      // .feed(1)
-      for (let i = 0; i < invoiceBodyData.length; i++) {
-        const {
-          saleDetailId,
-          saleId,
-          productId,
-          productTypeId,
-          productCode,
-          productName,
-          productMeasurementUnitId,
-          categoryName,
-          brandName,
-          measurementUnitName,
-          unitPrice,
-          unitPriceNoTaxes,
-          unitPriceIva,
-          unitPriceFovial,
-          unitPriceCotrans,
-          unitPriceTourism,
-          unitCost,
-          unitCostNoTaxes,
-          subTotalCost,
-          totalCostTaxes,
-          totalCost,
-          quantity,
-          subTotal,
-          isVoided,
-          isActive,
-          taxesData,
-          ivaTaxAmount,
-          fovialTaxAmount,
-          cotransTaxAmount,
-          tourismTaxAmount,
-          totalTaxes,
-          taxableSubTotal,
-          taxableSubTotalWithoutTaxes,
-          noTaxableSubTotal
-        } = invoiceBodyData[i];
-        // printer.tableCustom([
-        //   { text: `${invoiceBodyData[i].productName || ""}`, align: "LEFT", width: 1 }
-        // ])
-        printer.style('U').tableCustom([
-          // { text: `${Number(invoiceBodyData[i].quantity).toFixed(0) || 0}`, align: "LEFT", width: 0.15 },
-          { text: `${productName || ""}`, align: "LEFT", width: 0.99 },
-          // { text: `${"UNID"} x`, align: "LEFT", width: 0.25 },
-          // { text: `${Number(quantity).toFixed(4) || 0} x ${(+unitPrice - (+unitPriceFovial + +unitPriceCotrans + (isNoTaxableOperation ? +unitPriceIva : 0))).toFixed(4) || 0}`, align: "RIGHT", width: 0.25 },
-          // { text: `${(isNoTaxableOperation === 1 ? (+noTaxableSubTotal - +ivaTaxAmount - +fovialTaxAmount - +cotransTaxAmount) : (+taxableSubTotal - ((documentTypeId === 1 || documentTypeId === 2) ? 0 : +ivaTaxAmount) - +fovialTaxAmount - +cotransTaxAmount)).toFixed(4) || 0}`, align: "RIGHT", width: 0.20 }
-        ]);
+        tempLogoPath = path.join(
+          os.tmpdir(),
+          `receipt-logo-${Date.now()}-${Math.random().toString(36).slice(2)}${extension}`
+        );
 
-        printer.style('U').tableCustom([
-          // { text: `${Number(invoiceBodyData[i].quantity).toFixed(0) || 0}`, align: "LEFT", width: 0.15 },
-          // { text: `${"UNID"} x`, align: "LEFT", width: 0.25 },
-          { text: `${Number(quantity).toFixed(4) || 0} x $${(+unitPrice - (+unitPriceFovial + +unitPriceCotrans + +unitPriceTourism + (isNoTaxableOperation || (documentTypeId === 3 || documentTypeId === 4) ? +unitPriceIva : 0))).toFixed(4) || 0}`, align: "LEFT", width: 0.50 },
-          { text: `${(isNoTaxableOperation === 1 ? (+noTaxableSubTotal - +ivaTaxAmount - +fovialTaxAmount - +cotransTaxAmount - +tourismTaxAmount) : (+taxableSubTotal - ((documentTypeId === 1 || documentTypeId === 2) ? 0 : +ivaTaxAmount) - +fovialTaxAmount - +cotransTaxAmount - +tourismTaxAmount)).toFixed(4) || 0}`, align: "RIGHT", width: 0.50 }
-        ]);
+        await fs.promises.writeFile(tempLogoPath, response.data);
 
-        if ((i + 1) < invoiceBodyData.length) printer.feed(1);
-      } // LINE 15
-      printer.style('NORMAL')
-        // .feed(1)
-        .text('------------------------------------------------')
-        // .text('------------------------------------------')
-      // Solo mostrar GRAVADO si el valor es mayor a 0
-      const gravadoAmount = isNoTaxableOperation ? 0 : taxableSubTotal - ((+fovialTaxAmount + +cotransTaxAmount + +tourismTaxAmount + ((documentTypeId === 1 || documentTypeId === 2) ? 0 : +ivaTaxAmount)) || 0);
-      if (gravadoAmount > 0) {
-        printer.tableCustom([
-          { text: `GRAVADO`, align: "RIGHT", width: 0.75 },
-          { text: `${gravadoAmount.toFixed(2)}`, align: "RIGHT", width: 0.25 }
-        ]);
-      }
-      
-      // Solo mostrar EXENTO si el valor es mayor a 0
-      const exentoAmount = isNoTaxableOperation ? taxableSubTotalWithoutTaxes : 0;
-      if (exentoAmount > 0) {
-        printer.tableCustom([
-          { text: `EXENTO`, align: "RIGHT", width: 0.75 },
-          { text: `${exentoAmount.toFixed(2)}`, align: "RIGHT", width: 0.25 }
-        ]);
-      }
-      
-      printer.tableCustom([
-        { text: `SUMA TOTAL DE OPERACIONES`, align: "RIGHT", width: 0.75 },
-        { text: `${(isNoTaxableOperation ? taxableSubTotalWithoutTaxes : taxableSubTotal - ((+fovialTaxAmount + +cotransTaxAmount + +tourismTaxAmount + ((documentTypeId === 1 || documentTypeId === 2) ? 0 : +ivaTaxAmount)))).toFixed(2) || 0}`, align: "RIGHT", width: 0.25 }
-      ]);
-      if (!(documentTypeId === 1 || documentTypeId === 2)) {
-        printer.tableCustom([
-          { text: `IVA`, align: "RIGHT", width: 0.75 },
-          // { text: ``, align: "LEFT", width: 0.25 },
-          // { text: ``, align: "RIGHT", width: 0.25 },
-          { text: `${Number(isNoTaxableOperation ? 0 : ivaTaxAmount).toFixed(2) || 0}`, align: "RIGHT", width: 0.25 }
-        ]);
-      }
-      printer.tableCustom([
-        { text: `SUBTOTAL`, align: "RIGHT", width: 0.75 },
-        { text: `${(isNoTaxableOperation ? taxableSubTotalWithoutTaxes : taxableSubTotal - ((+fovialTaxAmount + +cotransTaxAmount + +tourismTaxAmount))).toFixed(2) || 0}`, align: "RIGHT", width: 0.25 }
-      ]);
-      
-      // Solo mostrar IVA PERCIBIDO si el valor es mayor a 0
-      if (+IVAperception > 0) {
-        printer.tableCustom([
-          { text: `IVA PERCIBIDO (1%)`, align: "RIGHT", width: 0.75 },
-          { text: `${Number(IVAperception).toFixed(2)}`, align: "RIGHT", width: 0.25 }
-        ]);
-      }
-      
-      // Solo mostrar IVA RETENIDO si el valor es mayor a 0
-      if (+IVAretention > 0) {
-        printer.tableCustom([
-          { text: `IVA RETENIDO (1%)`, align: "RIGHT", width: 0.75 },
-          { text: `${Number(IVAretention).toFixed(2)}`, align: "RIGHT", width: 0.25 }
-        ]);
-      }
-      if (+fovialTaxAmount !== null && +fovialTaxAmount > 0) {
-        printer.tableCustom([
-          { text: `FOVIAL ($0.20/gal)`, align: "RIGHT", width: 0.75 },
-          // { text: ``, align: "LEFT", width: 0.25 },
-          // { text: ``, align: "RIGHT", width: 0.25 },
-          { text: `${Number(fovialTaxAmount).toFixed(2) || 0}`, align: "RIGHT", width: 0.25 }
-        ]);
-      }
-      if (+cotransTaxAmount !== null && +cotransTaxAmount > 0) {
-        printer.tableCustom([
-          { text: `COTRANS ($0.10/gal)`, align: "RIGHT", width: 0.75 },
-          // { text: ``, align: "LEFT", width: 0.25 },
-          // { text: ``, align: "RIGHT", width: 0.25 },
-          { text: `${Number(cotransTaxAmount).toFixed(2) || 0}`, align: "RIGHT", width: 0.25 }
-        ]);
-      }
-      if (+tourismTaxAmount !== null && +tourismTaxAmount > 0) {
-        printer.tableCustom([
-          { text: `TURISMO (5%)`, align: "RIGHT", width: 0.75 },
-          // { text: ``, align: "LEFT", width: 0.25 },
-          // { text: ``, align: "RIGHT", width: 0.25 },
-          { text: `${Number(tourismTaxAmount).toFixed(2) || 0}`, align: "RIGHT", width: 0.25 }
-        ]);
-      }
-      
-      // Solo mostrar RETE. RENTA si el valor es mayor a 0
-      const reteRentaAmount = Number(0); // Este valor parece estar hardcodeado en 0
-      if (reteRentaAmount > 0) {
-        printer.tableCustom([
-          { text: `RETE. RENTA`, align: "RIGHT", width: 0.75 },
-          { text: `${reteRentaAmount.toFixed(2)}`, align: "RIGHT", width: 0.25 }
-        ]);
-      }
-      
-      printer.tableCustom([
-        { text: `MONTO TOTAL OPERACION`, align: "RIGHT", width: 0.75 },
-        { text: `${Number(+total - (isNoTaxableOperation ? +ivaTaxAmount : 0) - +IVAretention + +IVAperception).toFixed(2) || 0}`, align: "RIGHT", width: 0.25 }
-      ]);      
-      if (+tip !== null && +tip > 0) {
-        printer.tableCustom([
-          { text: `PROPINA`, align: "RIGHT", width: 0.75 },
-          // { text: ``, align: "LEFT", width: 0.25 },
-          // { text: ``, align: "RIGHT", width: 0.25 },
-          { text: `${Number(tip).toFixed(2) || 0}`, align: "RIGHT", width: 0.25 }
-        ]);
-      }
-      
-      // Solo mostrar OTROS MONTOS NO AFECTOS si el valor es mayor a 0
-      const otrosMontosAmount = Number(0); // Este valor parece estar hardcodeado en 0
-      if (otrosMontosAmount > 0) {
-        printer.tableCustom([
-          { text: `OTROS MONTOS NO AFECTOS`, align: "RIGHT", width: 0.75 },
-          { text: `${otrosMontosAmount.toFixed(2)}`, align: "RIGHT", width: 0.25 }
-        ]);
-      }
-      
-      printer.tableCustom([
-          { text: `TOTAL A PAGAR`, align: "RIGHT", width: 0.75 },
-          { text: `${Number(+total + +(tip || 0) - (isNoTaxableOperation ? +ivaTaxAmount : 0) - +IVAretention + +IVAperception).toFixed(2) || 0}`, align: "RIGHT", width: 0.25 }
-        ])
-        .feed(1);
-      
-      printer
-        .tableCustom([
-          { text: `($$$) RECIBIDO`, align: "RIGHT", width: 0.75 },
-          { text: `${Number(cashReceived || 0).toFixed(2)}`, align: "RIGHT", width: 0.25 }
-        ])
-        .tableCustom([
-          { text: `SU CAMBIO`, align: "RIGHT", width: 0.75 },
-          { text: `${Number((cashReceived || 0) - (+total + +(tip || 0) - (isNoTaxableOperation ? +ivaTaxAmount : 0) - +IVAretention + +IVAperception)).toFixed(2)}`, align: "RIGHT", width: 0.25 }
-        ]);
-        // .text('------------------------------------------')
-        // .tableCustom([
-        //   { text: `TOTAL`, align: "LEFT", width: 0.30 },
-        //   { text: ``, align: "LEFT", width: 0.25 },
-        //   { text: ``, align: "RIGHT", width: 0.25 },
-        //   { text: `${total || 0}`, align: "RIGHT", width: 0.20 }
-        // ])
-      printer.align('CT')
-        .feed(1)
-        .text(`CODIGO DE GENERACION:`)
-        .text(`${generationCode}`)
-        .text(`NUMERO DE CONTROL:`)
-        .text(`${controlNumber}`)
-        .text(`SELLO RECEPCION`)
-        .text(`${receptionStamp}`)
-        .feed(1)
-        .tableCustom([
-          { text: `ESTADO:`, align: "LEFT", width: 0.50 },
-          { text: `${dteTransmitionStatusName}`, align: "RIGHT", width: 0.50 }
-        ])
-        .tableCustom([
-          { text: `TIPO:`, align: "LEFT", width: 0.50 },
-          { text: `${transmissionTypeName}`, align: "RIGHT", width: 0.50 }
-        ])
-        .tableCustom([
-          { text: `MODELO TRANSMISION:`, align: "LEFT", width: 0.50 },
-          { text: `${transmissionModelName}`, align: "RIGHT", width: 0.50 }
-        ])
-        .align('CT')
-        // .text('')
-        // .feed(2)
-        .control('FF')
-        // .qrcode(
-        //   `https://admin.factura.gob.sv/consultaPublica?ambiente=01&codGen=${generationCode || ''}&fechaEmi=${dayjs(docDatetime).format('YYYY-MM-DD') || ''}`,
-        //   undefined,
-        //   "h",
-        //   50
-        // )
-        // .text('*** ESTE COMPROBANTE NO TIENE EFECTO FISCAL ***')
-        // .feed(2)
-        // .cut()
-        // .close((err) => {
-        //   if (err) {
-        //     res.json({ data: "Print error" });
-        //   } else {
-        //     res.json({ data: "Print success" });
-        //   }
-        // });
-        .qrimage(
-          `https://admin.factura.gob.sv/consultaPublica?ambiente=01&codGen=${generationCode || ''}&fechaEmi=${dayjs(docDatetime).format('YYYY-MM-DD') || ''}`,
-          { type: 'png', mode: 'dhdw', size: 3 },
-          function (err) {
-            if (dteVoucherFooterMessage) {
-              this.text(dteVoucherFooterMessage || '');
+        // Cargar imagen en memoria antes de abrir la impresora.
+        logoImage = await new Promise((resolve, reject) => {
+          escpos.Image.load(tempLogoPath, (image) => {
+            if (!image) {
+              reject(new Error('Unable to load receipt logo'));
+            } else {
+              resolve(image);
             }
-            this.text('*** ESTE COMPROBANTE NO TIENE EFECTO FISCAL ***');
-            this.feed(2);
-            this.cut();
-            this.cashdraw(2);
-            // this.beep(2, 100);
-            this.close((err) => {
-              if (err) {
-                res.json({ data: "Print error" });
-              } else {
-                res.json({ data: "Print success" });
-              }
-            });
           });
-      // .cut()
-      // .feed(2)
-      // .cashdraw(2)
-      // .close((err) => {
-      //   if (err) {
-      //     res.json({ data: "Print error" });
-      //   } else {
-      //     res.json({ data: "Print success" });
-      //   }
-      // });
+        });
+
+      } catch (logoError) {
+        console.warn(
+          'Unable to load branch receipt logo. Printing without logo:',
+          logoError.message
+        );
+
+        logoImage = null;
+        await cleanupTempLogo();
+      }
+    }
+
+    // =====================================================
+    // 2. CONFIGURAR DISPOSITIVO
+    // =====================================================
+
+    if (+useNetworkPrint === 1) {
+      device = new escpos.Network(
+        cashierPrinterIp || '192.168.1.100',
+        cashierPrinterPort || 9100
+      );
+    } else {
+      device = new escpos.USB(vId, pId);
+    }
+
+    const options = {
+      encoding: '857',
+      width: 48
+    };
+
+    printer = new escpos.Printer(device, options);
+
+    // =====================================================
+    // 3. ABRIR DISPOSITIVO E IMPRIMIR
+    // =====================================================
+
+    device.open(async (error) => {
+      if (error) {
+        await sendPrintError(error);
+        return;
+      }
+
+      try {
+        // -------------------------------------------------
+        // LOGO OPCIONAL: SIEMPRE AL INICIO DEL COMPROBANTE
+        // -------------------------------------------------
+
+        if (logoImage) {
+          printer.align('CT');
+
+          await printer.image(logoImage, 's24');
+
+          printer.feed(1);
+        }
+
+        // -------------------------------------------------
+        // ENCABEZADO DEL ESTABLECIMIENTO
+        // -------------------------------------------------
+
+        printer
+          .font('A')
+          .align('CT')
+          .style('NORMAL')
+          .size(1, 0);
+
+        if (ownerTradename) {
+          printer.text(String(ownerTradename).toUpperCase());
+        }
+
+        printer.size(0, 0);
+
+        if (ownerName) {
+          printer.text(ownerName.toUpperCase());
+        }
+
+        if (ownerActivityDescription) {
+          printer.text(String(ownerActivityDescription).toUpperCase());
+        }
+
+        printer
+          .text(`NIT: ${ownerNit || ''} - NRC: ${ownerNrc || ''}`)
+          .text(locationAddress || '')
+          .text(locationPhone || '')
+          .feed(1)
+          .align('LT')
+          .tableCustom([
+            {
+              text: `COD INTERNO: ${invoiceHeaderData.id}`,
+              align: 'LEFT',
+              width: 0.50
+            },
+            {
+              text: `COND: ${String(paymentTypeName).toUpperCase()}`,
+              align: 'RIGHT',
+              width: 0.50
+            }
+          ])
+          .tableCustom([
+            {
+              text: `DOC: ${documentTypeName}`,
+              align: 'LEFT',
+              width: 0.50
+            },
+            {
+              text: `SUC: ${String(locationName).toUpperCase()}`,
+              align: 'RIGHT',
+              width: 0.50
+            }
+          ])
+          .text(`FECHA: ${dayjs(docDatetime).format('YYYY-MM-DD hh:mm:ss')}`)
+          .text(`CLIENTE: ${customerFullname}`);
+
+        // -------------------------------------------------
+        // INFORMACIÓN DE DOMICILIO
+        // -------------------------------------------------
+
+        if (order_type === 'domicilio') {
+          if (orderCustomerComplementaryName) {
+            printer.text(`DOMICILIO PARA: ${orderCustomerComplementaryName}`);
+          }
+        }
+
+        // -------------------------------------------------
+        // INFORMACIÓN DEL CLIENTE
+        // -------------------------------------------------
+
+        if (customerId !== 1) {
+          printer
+            .text(`DUI: ${customerDui || '-'}`)
+            .text(`NIT: ${customerNit || '-'}`)
+            .text(`NRC: ${customerNrc || '-'}`);
+        }
+
+        // -------------------------------------------------
+        // VENDEDOR Y RUTA
+        // -------------------------------------------------
+
+        if (
+          companyId === 3 ||
+          companyId === 4 ||
+          companyId === 2 ||
+          companyId === 8
+        ) {
+          if (sellerPINCodeFullName && sellerPINCodeFullName !== '-') {
+            printer.text(`Vendedor: ${sellerPINCodeFullName}`);
+          }
+
+          if (deliveryRouteName && deliveryRouteName !== 'NO ASIGNADA') {
+            printer.text(`Ruta: ${deliveryRouteName}`);
+          }
+        }
+
+        // -------------------------------------------------
+        // DETALLE DE PRODUCTOS
+        // -------------------------------------------------
+
+        printer
+          .feed(1)
+          .align('CT')
+          .tableCustom([
+            { text: 'DESCRIPCION', align: 'LEFT', width: 0.55 },
+            { text: '', align: 'RIGHT', width: 0.25 },
+            { text: 'SUBTOTAL', align: 'RIGHT', width: 0.20 }
+          ])
+          .text('------------------------------------------------');
+
+        for (let i = 0; i < invoiceBodyData.length; i++) {
+          const {
+            productName,
+            unitPrice,
+            unitPriceIva,
+            unitPriceFovial,
+            unitPriceCotrans,
+            unitPriceTourism,
+            quantity,
+            ivaTaxAmount: detailIvaTaxAmount,
+            fovialTaxAmount: detailFovialTaxAmount,
+            cotransTaxAmount: detailCotransTaxAmount,
+            tourismTaxAmount: detailTourismTaxAmount,
+            taxableSubTotal: detailTaxableSubTotal,
+            taxableSubTotalWithoutTaxes: detailTaxableSubTotalWithoutTaxes,
+            noTaxableSubTotal
+          } = invoiceBodyData[i];
+
+          printer.style('U').tableCustom([
+            {
+              text: `${productName || ''}`,
+              align: 'LEFT',
+              width: 0.99
+            }
+          ]);
+
+          printer.style('U').tableCustom([
+            {
+              text: `${Number(quantity).toFixed(4) || 0} x $${(
+                +unitPrice -
+                (
+                  +unitPriceFovial +
+                  +unitPriceCotrans +
+                  +unitPriceTourism +
+                  (
+                    isNoTaxableOperation ||
+                    documentTypeId === 3 ||
+                    documentTypeId === 4
+                      ? +unitPriceIva
+                      : 0
+                  )
+                )
+              ).toFixed(4) || 0}`,
+              align: 'LEFT',
+              width: 0.50
+            },
+            {
+              text: `${
+                (
+                  isNoTaxableOperation === 1
+                    ? (
+                        +noTaxableSubTotal -
+                        +detailIvaTaxAmount -
+                        +detailFovialTaxAmount -
+                        +detailCotransTaxAmount -
+                        +detailTourismTaxAmount
+                      )
+                    : (
+                        +detailTaxableSubTotal -
+                        (
+                          (documentTypeId === 1 || documentTypeId === 2)
+                            ? 0
+                            : +detailIvaTaxAmount
+                        ) -
+                        +detailFovialTaxAmount -
+                        +detailCotransTaxAmount -
+                        +detailTourismTaxAmount
+                      )
+                ).toFixed(4) || 0
+              }`,
+              align: 'RIGHT',
+              width: 0.50
+            }
+          ]);
+
+          if ((i + 1) < invoiceBodyData.length) {
+            printer.feed(1);
+          }
+        }
+
+        // -------------------------------------------------
+        // TOTALES
+        // -------------------------------------------------
+
+        printer
+          .style('NORMAL')
+          .text('------------------------------------------------');
+
+        // GRAVADO
+        const gravadoAmount = isNoTaxableOperation
+          ? 0
+          : taxableSubTotal - (
+              (
+                +fovialTaxAmount +
+                +cotransTaxAmount +
+                +tourismTaxAmount +
+                (
+                  (documentTypeId === 1 || documentTypeId === 2)
+                    ? 0
+                    : +ivaTaxAmount
+                )
+              ) || 0
+            );
+
+        if (gravadoAmount > 0) {
+          printer.tableCustom([
+            { text: 'GRAVADO', align: 'RIGHT', width: 0.75 },
+            { text: `${gravadoAmount.toFixed(2)}`, align: 'RIGHT', width: 0.25 }
+          ]);
+        }
+
+        // EXENTO
+        const exentoAmount = isNoTaxableOperation
+          ? taxableSubTotalWithoutTaxes
+          : 0;
+
+        if (exentoAmount > 0) {
+          printer.tableCustom([
+            { text: 'EXENTO', align: 'RIGHT', width: 0.75 },
+            { text: `${exentoAmount.toFixed(2)}`, align: 'RIGHT', width: 0.25 }
+          ]);
+        }
+
+        // SUMA TOTAL DE OPERACIONES
+        printer.tableCustom([
+          { text: 'SUMA TOTAL DE OPERACIONES', align: 'RIGHT', width: 0.75 },
+          {
+            text: `${
+              (
+                isNoTaxableOperation
+                  ? taxableSubTotalWithoutTaxes
+                  : taxableSubTotal - (
+                      (
+                        +fovialTaxAmount +
+                        +cotransTaxAmount +
+                        +tourismTaxAmount +
+                        (
+                          (documentTypeId === 1 || documentTypeId === 2)
+                            ? 0
+                            : +ivaTaxAmount
+                        )
+                      )
+                    )
+              ).toFixed(2) || 0
+            }`,
+            align: 'RIGHT',
+            width: 0.25
+          }
+        ]);
+
+        // IVA
+        if (!(documentTypeId === 1 || documentTypeId === 2)) {
+          printer.tableCustom([
+            { text: 'IVA', align: 'RIGHT', width: 0.75 },
+            {
+              text: `${Number(isNoTaxableOperation ? 0 : ivaTaxAmount).toFixed(2) || 0}`,
+              align: 'RIGHT',
+              width: 0.25
+            }
+          ]);
+        }
+
+        // SUBTOTAL
+        printer.tableCustom([
+          { text: 'SUBTOTAL', align: 'RIGHT', width: 0.75 },
+          {
+            text: `${
+              (
+                isNoTaxableOperation
+                  ? taxableSubTotalWithoutTaxes
+                  : taxableSubTotal - (
+                      +fovialTaxAmount +
+                      +cotransTaxAmount +
+                      +tourismTaxAmount
+                    )
+              ).toFixed(2) || 0
+            }`,
+            align: 'RIGHT',
+            width: 0.25
+          }
+        ]);
+
+        // IVA PERCIBIDO
+        if (+IVAperception > 0) {
+          printer.tableCustom([
+            { text: 'IVA PERCIBIDO (1%)', align: 'RIGHT', width: 0.75 },
+            { text: `${Number(IVAperception).toFixed(2)}`, align: 'RIGHT', width: 0.25 }
+          ]);
+        }
+
+        // IVA RETENIDO
+        if (+IVAretention > 0) {
+          printer.tableCustom([
+            { text: 'IVA RETENIDO (1%)', align: 'RIGHT', width: 0.75 },
+            { text: `${Number(IVAretention).toFixed(2)}`, align: 'RIGHT', width: 0.25 }
+          ]);
+        }
+
+        // FOVIAL
+        if (+fovialTaxAmount > 0) {
+          printer.tableCustom([
+            { text: 'FOVIAL ($0.20/gal)', align: 'RIGHT', width: 0.75 },
+            { text: `${Number(fovialTaxAmount).toFixed(2) || 0}`, align: 'RIGHT', width: 0.25 }
+          ]);
+        }
+
+        // COTRANS
+        if (+cotransTaxAmount > 0) {
+          printer.tableCustom([
+            { text: 'COTRANS ($0.10/gal)', align: 'RIGHT', width: 0.75 },
+            { text: `${Number(cotransTaxAmount).toFixed(2) || 0}`, align: 'RIGHT', width: 0.25 }
+          ]);
+        }
+
+        // TURISMO
+        if (+tourismTaxAmount > 0) {
+          printer.tableCustom([
+            { text: 'TURISMO (5%)', align: 'RIGHT', width: 0.75 },
+            { text: `${Number(tourismTaxAmount).toFixed(2) || 0}`, align: 'RIGHT', width: 0.25 }
+          ]);
+        }
+
+        // RETENCIÓN DE RENTA
+        const reteRentaAmount = Number(0);
+
+        if (reteRentaAmount > 0) {
+          printer.tableCustom([
+            { text: 'RETE. RENTA', align: 'RIGHT', width: 0.75 },
+            { text: `${reteRentaAmount.toFixed(2)}`, align: 'RIGHT', width: 0.25 }
+          ]);
+        }
+
+        // MONTO TOTAL OPERACIÓN
+        printer.tableCustom([
+          { text: 'MONTO TOTAL OPERACION', align: 'RIGHT', width: 0.75 },
+          {
+            text: `${Number(
+              +total -
+              (isNoTaxableOperation ? +ivaTaxAmount : 0) -
+              +IVAretention +
+              +IVAperception
+            ).toFixed(2) || 0}`,
+            align: 'RIGHT',
+            width: 0.25
+          }
+        ]);
+
+        // PROPINA
+        if (+tip > 0) {
+          printer.tableCustom([
+            { text: 'PROPINA', align: 'RIGHT', width: 0.75 },
+            { text: `${Number(tip).toFixed(2) || 0}`, align: 'RIGHT', width: 0.25 }
+          ]);
+        }
+
+        // OTROS MONTOS NO AFECTOS
+        const otrosMontosAmount = Number(0);
+
+        if (otrosMontosAmount > 0) {
+          printer.tableCustom([
+            { text: 'OTROS MONTOS NO AFECTOS', align: 'RIGHT', width: 0.75 },
+            { text: `${otrosMontosAmount.toFixed(2)}`, align: 'RIGHT', width: 0.25 }
+          ]);
+        }
+
+        // TOTAL A PAGAR
+        printer
+          .tableCustom([
+            { text: 'TOTAL A PAGAR', align: 'RIGHT', width: 0.75 },
+            {
+              text: `${Number(
+                +total +
+                +(tip || 0) -
+                (isNoTaxableOperation ? +ivaTaxAmount : 0) -
+                +IVAretention +
+                +IVAperception
+              ).toFixed(2) || 0}`,
+              align: 'RIGHT',
+              width: 0.25
+            }
+          ])
+          .feed(1);
+
+        // EFECTIVO RECIBIDO Y CAMBIO
+        printer
+          .tableCustom([
+            { text: '($$$) RECIBIDO', align: 'RIGHT', width: 0.75 },
+            { text: `${Number(cashReceived || 0).toFixed(2)}`, align: 'RIGHT', width: 0.25 }
+          ])
+          .tableCustom([
+            { text: 'SU CAMBIO', align: 'RIGHT', width: 0.75 },
+            {
+              text: `${Number(
+                (cashReceived || 0) -
+                (
+                  +total +
+                  +(tip || 0) -
+                  (isNoTaxableOperation ? +ivaTaxAmount : 0) -
+                  +IVAretention +
+                  +IVAperception
+                )
+              ).toFixed(2)}`,
+              align: 'RIGHT',
+              width: 0.25
+            }
+          ]);
+
+        // -------------------------------------------------
+        // INFORMACIÓN DEL DTE
+        // -------------------------------------------------
+
+        printer
+          .align('CT')
+          .feed(1)
+          .text('CODIGO DE GENERACION:')
+          .text(`${generationCode}`)
+          .text('NUMERO DE CONTROL:')
+          .text(`${controlNumber}`)
+          .text('SELLO RECEPCION')
+          .text(`${receptionStamp}`)
+          .feed(1)
+          .tableCustom([
+            { text: 'ESTADO:', align: 'LEFT', width: 0.50 },
+            { text: `${dteTransmitionStatusName}`, align: 'RIGHT', width: 0.50 }
+          ])
+          .tableCustom([
+            { text: 'TIPO:', align: 'LEFT', width: 0.50 },
+            { text: `${transmissionTypeName}`, align: 'RIGHT', width: 0.50 }
+          ])
+          .tableCustom([
+            { text: 'MODELO TRANSMISION:', align: 'LEFT', width: 0.50 },
+            { text: `${transmissionModelName}`, align: 'RIGHT', width: 0.50 }
+          ])
+          .align('CT')
+          .control('FF');
+
+        // -------------------------------------------------
+        // CÓDIGO QR Y FINALIZACIÓN
+        // -------------------------------------------------
+
+        printer.qrimage(
+          `https://admin.factura.gob.sv/consultaPublica?ambiente=01&codGen=${generationCode || ''}&fechaEmi=${dayjs(docDatetime).format('YYYY-MM-DD') || ''}`,
+          {
+            type: 'png',
+            mode: 'dhdw',
+            size: 3
+          },
+          async function (qrError) {
+            try {
+              if (qrError) {
+                throw qrError;
+              }
+
+              if (dteVoucherFooterMessage) {
+                this.text(dteVoucherFooterMessage);
+              }
+
+              this
+                .text('*** ESTE COMPROBANTE NO TIENE EFECTO FISCAL ***')
+                .feed(2)
+                .cut()
+                .cashdraw(2);
+
+              // Cerrar dispositivo después de completar la impresión.
+              this.close(async (closeError) => {
+                await cleanupTempLogo();
+
+                if (closeError) {
+                  if (!res.headersSent) {
+                    res.json({ data: 'Print error' });
+                  }
+                } else if (!res.headersSent) {
+                  res.json({ data: 'Print success' });
+                }
+              });
+
+            } catch (qrPrintError) {
+              console.error('QR / final printing error:', qrPrintError);
+
+              this.close(async () => {
+                await sendPrintError(qrPrintError);
+              });
+            }
+          }
+        );
+
+      } catch (printError) {
+        console.error('Ticket printing error:', printError);
+
+        printer.close(async () => {
+          await sendPrintError(printError);
+        });
+      }
     });
   } catch (err) {
-    res.status(500).json({ status: 500, message: 'Printer not found!', errorContent: err });
+    await cleanupTempLogo();
+
+    console.error('Print DTE voucher error:', err);
+
+    if (!res.headersSent) {
+      res.status(500).json({
+        status: 500,
+        message: 'Printer not found!',
+        errorContent: err?.message || err
+      });
+    }
   }
-}
+};
 
 controller.printExpenseVoucher = (req, res) => {
   try {
