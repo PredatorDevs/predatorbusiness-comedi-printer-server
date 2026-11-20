@@ -996,36 +996,95 @@ controller.printCFTicket = (req, res) => {
 controller.printInternalSaleTicket = (req, res) => {
   try {
     // const device  = new escpos.USB(vId, pId);
-    const device = new escpos.Network('127.0.0.1', 9105);
-    const options = { encoding: "857", width: 48 /* default */ }
-    const printer = new escpos.Printer(device, options);
+    // const device = new escpos.Network('127.0.0.1', 9105);
+    // const options = { encoding: "857", width: 48 /* default */ }
+    // const printer = new escpos.Printer(device, options);
 
     // invoiceHeaderData = { customerFullname, documentDatetime, customerAddress, customerDui, customerNit, customerPhone, totalSale, totalToLetters }
     // invoiceBodyData = [{ quantity, description, unitPrice, subTotal }]
-    const { invoiceHeaderData, invoiceBodyData } = req.body;
-
-    if (invoiceHeaderData === undefined || invoiceBodyData === undefined) {
-      throw "You must provide a header and body sale data to print";
-    }
+    const { useNetworkPrint } = req.query;
 
     const {
-      customerFullname,
-      locationName,
-      documentTypeName,
-      docNumber,
-      documentDatetime,
-      customerAddress,
+      invoiceHeaderData,
+      invoiceBodyData,
+      cashierPrinterIp,
+      cashierPrinterPort
+    } = req.body;
+
+    if (invoiceHeaderData === undefined || invoiceBodyData === undefined) {
+      throw new Error('You must provide a header and body sale data to print');
+    }
+
+    if (!Array.isArray(invoiceBodyData)) {
+      throw new Error('invoiceBodyData must be an array');
+    }
+
+    if (+useNetworkPrint === 1) {
+      device = new escpos.Network(
+        cashierPrinterIp || '192.168.1.100',
+        cashierPrinterPort || 9100
+      );
+    } else {
+      device = new escpos.USB(vId, pId);
+    }
+
+    const options = {
+      encoding: '857',
+      width: 48
+    };
+
+    printer = new escpos.Printer(device, options);
+
+    const {
+      companyId,
+      controlNumber,
       customerDui,
+      customerFullname,
+      customerId,
       customerNit,
-      customerPhone,
+      customerNrc,
+      docDatetime,
+      docNumber,
+      documentTypeId,
+      documentTypeName,
+      dteTransmitionStatusName,
+      generationCode,
+      isNoTaxableOperation,
+      IVAperception,
+      IVAretention,
+      ivaTaxAmount,
+      locationAddress,
+      locationName,
+      locationPhone,
+      locationReceiptLogoUrl,
+      ownerActivityDescription,
+      ownerName,
+      ownerNit,
+      ownerNrc,
+      ownerTradename,
+      order_type,
+      orderCustomerComplementaryName,
       paymentTypeName,
-      totalSale,
-      totalToLetters
+      receptionStamp,
+      taxableSubTotal,
+      taxableSubTotalWithoutTaxes,
+      total,
+      totalInLetters,
+      transmissionModelName,
+      transmissionTypeName,
+      tip,
+      cashReceived,
+      dteVoucherFooterMessage,
+      deliveryRouteName,
+      sellerPINCodeFullName,
+      fovialTaxAmount,
+      cotransTaxAmount,
+      tourismTaxAmount
     } = invoiceHeaderData;
 
-    let totalToLettersSplited = (totalToLetters || " ( ").split("(", 2);
-    let totalToLettersPartOne = totalToLettersSplited[0];
-    let totalToLettersPartTwo = `(${totalToLettersSplited[1]}`;
+    // let totalToLettersSplited = (totalToLetters || " ( ").split("(", 2);
+    // let totalToLettersPartOne = totalToLettersSplited[0];
+    // let totalToLettersPartTwo = `(${totalToLettersSplited[1]}`;
 
     device.open(function (error) {
       printer
@@ -1033,10 +1092,10 @@ controller.printInternalSaleTicket = (req, res) => {
         .align('CT')
         .style('NORMAL')
         .size(0, 0)
-        .text('LLANTERIA CORINTO Y TALLER AMAYA')
-        .text('BO. LA ALIANZA, CORINTO, MORAZAN')
-        .text(`Tel: ${'7339-2091'}`)
-        .text('*** TICKET DE CONTROL INTERNO ***')
+        .text(ownerTradename)
+        .text(locationAddress)
+        .text(`Tel: ${locationPhone}`)
+        // .text('*** TICKET DE CONTROL INTERNO ***')
         // .text(`NIT: ${'0000-000000-000-0'} - NRC: ${'00000-0'}`)
         .feed(1)
         .align('LT')
@@ -1048,9 +1107,9 @@ controller.printInternalSaleTicket = (req, res) => {
           { text: ``, align: "LEFT", width: 0.50 },
           { text: `SUC: ${String(locationName).toUpperCase()}`, align: "RIGHT", width: 0.50 }
         ])
-        .text(`Fecha: ${documentDatetime}`)
+        .text(`Fecha: ${docDatetime}`)
         .text(`Cliente: ${customerFullname}`)
-        .text(`DUI o NIT: ${customerDui || customerNit || '-'}`)
+        // .text(`DUI o NIT: ${customerDui || customerNit || '-'}`)
         .feed(1) // LINE 9
         .align('CT')
         // .text('------------------------------------------------')
@@ -1075,8 +1134,8 @@ controller.printInternalSaleTicket = (req, res) => {
           // { text: `${Number(invoiceBodyData[i].quantity).toFixed(0) || 0}`, align: "LEFT", width: 0.15 },
           { text: `${invoiceBodyData[i].productName || ""}`, align: "LEFT", width: 0.55 },
           // { text: `${"UNID"} x`, align: "LEFT", width: 0.25 },
-          { text: `${Number(invoiceBodyData[i].quantity).toFixed(0) || 0} x ${invoiceBodyData[i].unitPrice || 0}`, align: "RIGHT", width: 0.25 },
-          { text: `${invoiceBodyData[i].subTotal || 0}`, align: "RIGHT", width: 0.20 }
+          { text: `${Number(invoiceBodyData[i].quantity).toFixed(0) || 0} x ${Number(invoiceBodyData[i].unitPrice || 0).toFixed(2)}`, align: "RIGHT", width: 0.25 },
+          { text: `${Number(invoiceBodyData[i].subTotal || 0).toFixed(2)}`, align: "RIGHT", width: 0.20 }
         ]);
 
         if ((i + 1) < invoiceBodyData.length) printer.feed(1);
@@ -1085,21 +1144,21 @@ controller.printInternalSaleTicket = (req, res) => {
         // .feed(1)
         .text('------------------------------------------------')
         // .text('------------------------------------------')
-        .tableCustom([
-          { text: `SUMAS`, align: "LEFT", width: 0.30 },
-          { text: ``, align: "LEFT", width: 0.25 },
-          { text: ``, align: "RIGHT", width: 0.25 },
-          { text: `${totalSale || 0}`, align: "RIGHT", width: 0.20 }
-        ])
+        // .tableCustom([
+        //   { text: `SUMAS`, align: "LEFT", width: 0.30 },
+        //   { text: ``, align: "LEFT", width: 0.25 },
+        //   { text: ``, align: "RIGHT", width: 0.25 },
+        //   { text: `${total || 0}`, align: "RIGHT", width: 0.20 }
+        // ])
         .tableCustom([
           { text: `TOTAL`, align: "LEFT", width: 0.30 },
           { text: ``, align: "LEFT", width: 0.25 },
           { text: ``, align: "RIGHT", width: 0.25 },
-          { text: `${totalSale || 0}`, align: "RIGHT", width: 0.20 }
+          { text: `${Number(total || 0).toFixed(2)}`, align: "RIGHT", width: 0.20 }
         ])
         .align('CT')
-        .feed(1)
-        .text('*** SIN EFECTO FISCAL ***')
+        // .feed(1)
+        // .text('*** SIN EFECTO FISCAL ***')
         .feed(2)
         .control('FF')
         .cut()
@@ -1114,6 +1173,7 @@ controller.printInternalSaleTicket = (req, res) => {
         });
     });
   } catch (err) {
+    console.log(err);
     res.status(500).json({ status: 500, message: 'Printer not found!', errorContent: err });
   }
 }
